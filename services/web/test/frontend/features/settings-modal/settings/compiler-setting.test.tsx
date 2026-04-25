@@ -26,6 +26,10 @@ const OPTIONS = [
     label: 'LuaLaTeX',
     value: 'lualatex',
   },
+  {
+    label: 'Typst',
+    value: 'typst',
+  },
 ]
 
 describe('<CompilerSetting />', function () {

@@ -80,9 +80,26 @@ describe('RequestParser', () => {
       ctx.callback
         .calledWithMatch({
           message:
-            'compiler attribute should be one of: pdflatex, latex, xelatex, lualatex',
+            'compiler attribute should be one of: pdflatex, latex, xelatex, lualatex, typst',
         })
         .should.equal(true)
+    })
+  })
+
+  describe('with typst as compiler', () => {
+    beforeEach(async ctx => {
+      await new Promise((resolve, reject) => {
+        ctx.validRequest.compile.options.compiler = 'typst'
+        ctx.RequestParser.parse(ctx.validRequest, (error, data) => {
+          if (error) return reject(error)
+          ctx.data = data
+          resolve()
+        })
+      })
+    })
+
+    it('should accept typst', ctx => {
+      ctx.data.compiler.should.equal('typst')
     })
   })
 

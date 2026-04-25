@@ -54,6 +54,13 @@ describe('ProjectOptionsHandler', function () {
       args[1].compiler.should.equal('xelatex')
     })
 
+    it('should accept typst compiler', async function (ctx) {
+      await ctx.handler.promises.setCompiler(projectId, 'Typst')
+      const args = ctx.projectModel.updateOne.args[0]
+      args[0]._id.should.equal(projectId)
+      args[1].compiler.should.equal('typst')
+    })
+
     it('should not perform and update on mongo if it is not a recognised compiler', async function (ctx) {
       await expect(
         ctx.handler.promises.setCompiler(projectId, 'something')

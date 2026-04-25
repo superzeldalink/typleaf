@@ -11,8 +11,10 @@ const MODULE_PATH = path.join(
 describe('LatexRunner', () => {
   beforeEach(async ctx => {
     ctx.Settings = {
-      docker: {
-        socketPath: '/var/run/docker.sock',
+      clsi: {
+        docker: {
+          socketPath: '/var/run/docker.sock',
+        },
       },
     }
     ctx.commandRunnerOutput = {
@@ -164,6 +166,54 @@ describe('LatexRunner', () => {
           '-lualatex',
           '$COMPILE_DIR/main-file.tex',
         ])
+      })
+    })
+
+    describe('with typst compiler', () => {
+      beforeEach(async ctx => {
+        await new Promise((resolve, reject) => {
+          ctx.compiler = 'typst'
+          ctx.mainFile = 'main.typ'
+          ctx.call(err => {
+            if (err) reject(err)
+            resolve()
+          })
+        })
+      })
+
+      it('should run typst compile command', ctx => {
+        ctx.CommandRunner.run.should.have.been.calledWith(ctx.project_id, [
+          'typst',
+          'compile',
+          '--root',
+          '$COMPILE_DIR',
+          '$COMPILE_DIR/main.typ',
+          '$COMPILE_DIR/output.pdf',
+        ])
+      })
+    })
+
+    describe('with typst compiler and default typst image', () => {
+      beforeEach(async ctx => {
+        await new Promise((resolve, reject) => {
+          ctx.compiler = 'typst'
+          ctx.mainFile = 'main.typ'
+          ctx.image = undefined
+          ctx.Settings.clsi.typstImage = 'typst/image:latest'
+          ctx.call(err => {
+            if (err) reject(err)
+            resolve()
+          })
+        })
+      })
+
+      it('should use typst image when no image is provided', ctx => {
+        ctx.CommandRunner.run.should.have.been.calledWith(
+          ctx.project_id,
+          sinon.match.any,
+          ctx.directory,
+          'typst/image:latest'
+        )
       })
     })
 

@@ -15,7 +15,7 @@ The provided `Dockerfile` builds a Docker image which has the Docker command lin
 The CLSI can be configured through the following environment variables:
 
 - `ALLOWED_COMPILE_GROUPS` - Space separated list of allowed compile groups
-- `ALLOWED_IMAGES` - Space separated list of allowed Docker TeX Live images
+- `ALLOWED_IMAGES` - Space separated list of allowed Docker images for compiles
 - `CATCH_ERRORS` - Set to `true` to log uncaught exceptions
 - `COMPILE_GROUP_DOCKER_CONFIGS` - JSON string of Docker configs for compile groups
 - `SANDBOXED_COMPILES` - Set to true to use sibling containers
@@ -29,6 +29,7 @@ The CLSI can be configured through the following environment variables:
 - `PROCESS_LIFE_SPAN_LIMIT_MS` - Process life span limit in milliseconds
 - `SMOKE_TEST` - Whether to run smoke tests
 - `TEXLIVE_IMAGE` - The TeX Live Docker image to use for sibling containers, e.g. `us-east1-docker.pkg.dev/overleaf-ops/ol-docker/texlive-full:2025.1`
+- `TYPST_IMAGE` - Optional Docker image to use when `compiler` is set to `typst`
 - `TEX_LIVE_IMAGE_NAME_OVERRIDE` - The name of the registry for the Docker image e.g. `us-east1-docker.pkg.dev/overleaf-ops/ol-docker`
 - `TEXLIVE_IMAGE_USER` - When using sibling containers, the user to run as in the TeX Live image. Defaults to `tex`
 - `TEXLIVE_OPENOUT_ANY` - Sets the `openout_any` environment variable for TeX Live (see the `\openout` primitive [documentation](http://tug.org/texinfohtml/web2c.html#tex-invocation))
@@ -126,7 +127,7 @@ The CLSI is based on a JSON API.
 {
   compile: {
     options: {
-      // Which compiler to use. Can be latex, pdflatex, xelatex or lualatex
+      // Which compiler to use. Can be latex, pdflatex, xelatex, lualatex or typst
       compiler: 'lualatex',
       // How many seconds to wait before killing the process. Default is 60.
       timeout: 40,

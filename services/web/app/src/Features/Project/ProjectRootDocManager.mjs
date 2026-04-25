@@ -191,11 +191,19 @@ function _rootDocSort(a, b) {
   if (a.elements !== b.elements) {
     return a.elements - b.elements
   }
-  // ensure main.tex is at the start of each folder
-  if (a.name === 'main.tex' && b.name !== 'main.tex') {
+  // ensure main.typ/main.tex are at the start of each folder
+  if (
+    (a.name === 'main.typ' || a.name === 'main.tex') &&
+    b.name !== 'main.typ' &&
+    b.name !== 'main.tex'
+  ) {
     return -1
   }
-  if (a.name !== 'main.tex' && b.name === 'main.tex') {
+  if (
+    a.name !== 'main.typ' &&
+    a.name !== 'main.tex' &&
+    (b.name === 'main.typ' || b.name === 'main.tex')
+  ) {
     return 1
   }
   // prefer smaller files

@@ -128,6 +128,7 @@ if ((process.env.DOCKER_RUNNER || process.env.SANDBOXED_COMPILES) === 'true') {
 
   module.exports.clsi = {
     dockerRunner: true,
+    typstImage: process.env.TYPST_IMAGE,
     docker: {
       runtime: process.env.DOCKER_RUNTIME,
       image:

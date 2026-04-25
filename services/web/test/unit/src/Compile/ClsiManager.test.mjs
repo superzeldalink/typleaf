@@ -818,6 +818,26 @@ describe('ClsiManager', function () {
       })
     })
 
+    describe('when the project uses typst compiler', function () {
+      beforeEach(async function (ctx) {
+        ctx.project.compiler = 'typst'
+        await ctx.ClsiManager.promises.sendRequest(
+          ctx.project._id,
+          ctx.user_id,
+          {}
+        )
+      })
+
+      it('should keep typst as compiler', function (ctx) {
+        expect(ctx.FetchUtils.fetchStringWithResponse).to.have.been.calledWith(
+          sinon.match.any,
+          sinon.match({
+            json: { compile: { options: { compiler: 'typst' } } },
+          })
+        )
+      })
+    })
+
     describe('when there is no valid root document', function () {
       beforeEach(async function (ctx) {
         ctx.project.rootDoc_id = 'not-valid'
@@ -833,6 +853,39 @@ describe('ClsiManager', function () {
           sinon.match.any,
           sinon.match({
             json: { compile: { rootResourcePath: 'main.tex' } },
+          })
+        )
+      })
+    })
+
+    describe('when typst project has no valid root document', function () {
+      beforeEach(async function (ctx) {
+        ctx.project.compiler = 'typst'
+        ctx.project.rootDoc_id = 'not-valid'
+        ctx.ProjectEntityHandler.promises.getAllDocs.resolves({
+          '/main.typ': {
+            name: 'main.typ',
+            _id: 'mock-doc-id-1',
+            lines: ['= Hello Typst'],
+          },
+          '/chapters/chapter1.typ': {
+            name: 'chapter1.typ',
+            _id: 'mock-doc-id-2',
+            lines: ['= Chapter 1'],
+          },
+        })
+        await ctx.ClsiManager.promises.sendRequest(
+          ctx.project._id,
+          ctx.user_id,
+          {}
+        )
+      })
+
+      it('should set to main.typ', function (ctx) {
+        expect(ctx.FetchUtils.fetchStringWithResponse).to.have.been.calledWith(
+          sinon.match.any,
+          sinon.match({
+            json: { compile: { rootResourcePath: 'main.typ' } },
           })
         )
       })

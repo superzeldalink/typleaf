@@ -35,7 +35,7 @@ const NewBackendCloudClsiCookieManager = ClsiCookieManagerFactory(
   Settings.apis.clsi_new?.backendGroupName
 )
 
-const VALID_COMPILERS = ['pdflatex', 'latex', 'xelatex', 'lualatex']
+const VALID_COMPILERS = ['pdflatex', 'latex', 'xelatex', 'lualatex', 'typst']
 const OUTPUT_FILE_TIMEOUT_MS = 60000
 const CLSI_COOKIES_ENABLED = (Settings.clsiCookie?.key ?? '') !== ''
 
@@ -744,7 +744,7 @@ async function _buildRequest(projectId, userId, options) {
     throw new Errors.NotFoundError(`project does not exist: ${projectId}`)
   }
   if (!VALID_COMPILERS.includes(project.compiler)) {
-    project.compiler = 'pdflatex'
+    project.compiler = 'typst'
   }
   const historyId = project.overleaf.history.id
   let { baseHistoryVersion } = options
@@ -1065,7 +1065,8 @@ function _finaliseRequest(projectId, options, project, docs, files) {
   let flags
   let rootResourcePath = options.rootResourcePath
   let rootResourcePathOverride = null
-  let hasMainFile = false
+  let hasMainTexFile = false
+  let hasMainTypFile = false
   let numberOfDocsInProject = 0
 
   for (let path in docs) {
@@ -1092,7 +1093,10 @@ function _finaliseRequest(projectId, options, project, docs, files) {
       rootResourcePathOverride = path
     }
     if (path === 'main.tex') {
-      hasMainFile = true
+      hasMainTexFile = true
+    }
+    if (path === 'main.typ') {
+      hasMainTypFile = true
     }
   }
 
@@ -1100,7 +1104,9 @@ function _finaliseRequest(projectId, options, project, docs, files) {
     rootResourcePath = rootResourcePathOverride
   }
   if (rootResourcePath == null) {
-    if (hasMainFile) {
+    if (project.compiler === 'typst' && hasMainTypFile) {
+      rootResourcePath = 'main.typ'
+    } else if (hasMainTexFile) {
       rootResourcePath = 'main.tex'
     } else if (numberOfDocsInProject === 1) {
       // only one file, must be the main document

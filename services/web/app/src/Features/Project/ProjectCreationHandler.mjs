@@ -88,7 +88,9 @@ async function createProjectFromSnippet(ownerId, projectName, docLines) {
 async function createBasicProject(ownerId, projectName) {
   const project = await _createBlankProject(ownerId, projectName)
 
-  const docLines = await _buildTemplate('mainbasic.tex', ownerId, projectName)
+  const templateName =
+    project.compiler === 'typst' ? 'mainbasic.typ' : 'mainbasic.tex'
+  const docLines = await _buildTemplate(templateName, ownerId, projectName)
   await _createRootDoc(project, ownerId, docLines)
 
   AnalyticsManager.recordEventForUserInBackground(ownerId, 'project-created', {
@@ -186,8 +188,13 @@ async function createExampleProject(ownerId, projectName, attributes = {}) {
 }
 
 async function _addExampleProjectFiles(ownerId, projectName, project) {
+  const mainFilePath =
+    project.compiler === 'typst'
+      ? `${templateProjectDir}/main.typ`
+      : `${templateProjectDir}/main.tex`
+  const rootDocPath = project.compiler === 'typst' ? 'main.typ' : 'main.tex'
   const mainDocLines = await _buildTemplate(
-    `${templateProjectDir}/main.tex`,
+    mainFilePath,
     ownerId,
     projectName
   )
@@ -223,7 +230,7 @@ async function _addExampleProjectFiles(ownerId, projectName, project) {
   return {
     fileEntries: [{ path: fileRef.name, file: fileRef }],
     docEntries: [
-      { path: 'main.tex', doc: rootDoc, docLines: mainDocLines.join('\n') },
+      { path: rootDocPath, doc: rootDoc, docLines: mainDocLines.join('\n') },
       { path: 'sample.bib', doc: bibDoc, docLines: bibDocLines.join('\n') },
     ],
   }
@@ -301,10 +308,11 @@ async function _createBlankProject(
 
 async function _createRootDoc(project, ownerId, docLines) {
   try {
+    const rootDocName = project.compiler === 'typst' ? 'main.typ' : 'main.tex'
     const { doc } = await ProjectEntityUpdateHandler.promises.addDoc(
       project._id,
       project.rootFolder[0]._id,
-      'main.tex',
+      rootDocName,
       docLines,
       ownerId,
       null

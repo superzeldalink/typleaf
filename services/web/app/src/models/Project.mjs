@@ -36,7 +36,7 @@ export const ProjectSchema = new Schema(
     mainBibliographyDoc_id: { type: ObjectId },
     version: { type: Number }, // incremented for every change in the project structure (folders and filenames)
     publicAccesLevel: { type: String, default: 'private' },
-    compiler: { type: String, default: 'pdflatex' },
+    compiler: { type: String, default: 'typst' },
     spellCheckLanguage: { type: String, default: 'en' },
     deletedByExternalDataSource: { type: Boolean, default: false },
     description: { type: String, default: '' },
