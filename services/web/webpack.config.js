@@ -168,7 +168,12 @@ module.exports = {
         type: 'javascript/auto',
       },
       {
+        test: /typst_syntax_bg\.wasm$/,
+        type: 'webassembly/async',
+      },
+      {
         test: /\.wasm$/,
+        exclude: /typst_syntax_bg\.wasm$/,
         type: 'asset/resource',
         generator: {
           filename: 'js/[name]-[contenthash][ext]',

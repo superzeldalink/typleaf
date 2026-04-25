@@ -1,5 +1,5 @@
 services:
-  sharelatex:
+  typst:
     restart: always
     # Server Pro users:
     # image: quay.io/sharelatex/sharelatex-pro
@@ -7,7 +7,7 @@ services:
     build:
       context: .
       dockerfile: dockerfiles/sharelatex/Dockerfile
-    container_name: sharelatex
+    container_name: typst
     depends_on:
       mongo:
         condition: service_healthy
@@ -24,7 +24,7 @@ services:
       ########################################################################
       # - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      OVERLEAF_APP_NAME: Overleaf Community Edition
+      OVERLEAF_APP_NAME: Typst Studio
 
       OVERLEAF_MONGO_URL: mongodb://mongo/sharelatex
 
