@@ -192,7 +192,7 @@ async function importDocx(req, res, next) {
           name,
           archivePath
         )
-      await ProjectOptionsHandler.promises.setCompiler(project._id, 'lualatex')
+      await ProjectOptionsHandler.promises.setCompiler(project._id, 'typst')
       res.json({ success: true, project_id: project._id })
     } finally {
       await fsPromises.unlink(archivePath).catch(() => {})

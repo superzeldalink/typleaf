@@ -20,7 +20,7 @@ export default ProjectEditorHandler = {
       rootFolder: [this.buildFolderModelView(project.rootFolder[0])],
       publicAccesLevel: project.publicAccesLevel,
       dropboxEnabled: !!project.existsInDropbox,
-      compiler: project.compiler,
+      compiler: 'typst',
       description: project.description,
       spellCheckLanguage: project.spellCheckLanguage,
       deletedByExternalDataSource: project.deletedByExternalDataSource || false,

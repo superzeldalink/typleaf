@@ -8,22 +8,6 @@ import { useSetCompilationSettingWithEvent } from '@/features/editor-left-menu/h
 
 const OPTIONS: Option<ProjectCompiler>[] = [
   {
-    value: 'pdflatex',
-    label: 'pdfLaTeX',
-  },
-  {
-    value: 'latex',
-    label: 'LaTeX',
-  },
-  {
-    value: 'xelatex',
-    label: 'XeLaTeX',
-  },
-  {
-    value: 'lualatex',
-    label: 'LuaLaTeX',
-  },
-  {
     value: 'typst',
     label: 'Typst',
   },

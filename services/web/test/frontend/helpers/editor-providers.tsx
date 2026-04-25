@@ -122,7 +122,7 @@ export const projectDefaults: ProjectMetadata = {
     },
   ],
   imageName: 'texlive-full:2024.1',
-  compiler: 'pdflatex' as ProjectCompiler,
+  compiler: 'typst' as ProjectCompiler,
   members: [],
   invites: [],
   trackChangesState: {} as Record<UserId | '__guests__', boolean>,

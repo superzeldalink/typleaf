@@ -11,22 +11,6 @@ import userEvent from '@testing-library/user-event'
 
 const OPTIONS = [
   {
-    label: 'pdfLaTeX',
-    value: 'pdflatex',
-  },
-  {
-    label: 'LaTeX',
-    value: 'latex',
-  },
-  {
-    label: 'XeLaTeX',
-    value: 'xelatex',
-  },
-  {
-    label: 'LuaLaTeX',
-    value: 'lualatex',
-  },
-  {
     label: 'Typst',
     value: 'typst',
   },

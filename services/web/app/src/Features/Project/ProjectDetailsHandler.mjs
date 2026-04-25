@@ -61,7 +61,7 @@ async function getDetails(projectId) {
   const details = {
     name: project.name,
     description: project.description,
-    compiler: project.compiler,
+    compiler: 'typst',
     features:
       user != null && user.features != null
         ? user.features
