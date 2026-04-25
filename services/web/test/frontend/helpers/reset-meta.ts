@@ -53,6 +53,7 @@ export function resetMeta() {
       'rnw',
       'ltx',
       'inc',
+      'typ',
     ],
     editableFilenames: ['latexmkrc', '.latexmkrc', 'makefile', 'gnumakefile'],
   })
