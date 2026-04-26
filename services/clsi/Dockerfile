@@ -53,7 +53,7 @@ CMD ["node", "--expose-gc", "app.js"]
 
 FROM app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
+    && apt-get install -y --no-install-recommends ca-certificates curl qpdf xz-utils \
     && rm -rf /var/lib/apt/lists/* \
     && arch="$(dpkg --print-architecture)" \
     && case "$arch" in \
