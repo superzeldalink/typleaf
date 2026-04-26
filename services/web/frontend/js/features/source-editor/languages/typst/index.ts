@@ -5,6 +5,7 @@ import {
   typstCommandCompletionSource,
   typstPathCompletionSource,
 } from './complete'
+import { openAutocomplete } from './open-autocomplete'
 
 const completionSources: CompletionSource[] = [
   typstPathCompletionSource,
@@ -16,6 +17,7 @@ export const typst = () => {
 
   return new LanguageSupport(support.language, [
     support.support,
+    openAutocomplete(),
     ...completionSources.map(completionSource =>
       support.language.data.of({
         autocomplete: completionSource,
