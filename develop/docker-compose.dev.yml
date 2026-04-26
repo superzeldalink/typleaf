@@ -127,6 +127,8 @@ services:
       - ../services/web/public:/overleaf/services/web/public
 
   webpack:
+    environment:
+      - DISABLE_WEBPACK_OVERLAY=true
     volumes:
       - ../services/web/app:/overleaf/services/web/app
       - ../services/web/config:/overleaf/services/web/config

@@ -1,4 +1,4 @@
-FROM sharelatex/sharelatex
+FROM develop-web
 
 USER root
 
@@ -12,9 +12,15 @@ RUN set -eux; \
     install -m 0755 /tmp/typst/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst; \
     rm -rf /tmp/typst /tmp/typst.tar.xz
 
-COPY dockerfiles/sharelatex/LatexRunner.js /overleaf/services/clsi/app/js/LatexRunner.js
+RUN mkdir -p /overleaf/services/clsi/app/js
+
+COPY dockerfiles/sharelatex/LatexRunner.js /tmp/LatexRunner.js
 
 RUN set -eux; \
-    sed -i "s/\\['pdflatex', 'latex', 'xelatex', 'lualatex'\\]/['pdflatex', 'latex', 'xelatex', 'lualatex', 'typst']/" /overleaf/services/clsi/app/js/RequestParser.js; \
+    if [ -f /overleaf/services/clsi/app/js/RequestParser.js ]; then \
+      cp /tmp/LatexRunner.js /overleaf/services/clsi/app/js/LatexRunner.js; \
+      sed -i "s/\\['pdflatex', 'latex', 'xelatex', 'lualatex'\\]/['pdflatex', 'latex', 'xelatex', 'lualatex', 'typst']/" /overleaf/services/clsi/app/js/RequestParser.js; \
+    fi; \
     sed -i "s/\\['pdflatex', 'latex', 'xelatex', 'lualatex'\\]/['pdflatex', 'latex', 'xelatex', 'lualatex', 'typst']/" /overleaf/services/web/app/src/Features/Compile/ClsiManager.mjs; \
-    sed -i "s/\\['xelatex', 'pdflatex', 'latex', 'lualatex'\\]/['xelatex', 'pdflatex', 'latex', 'lualatex', 'typst']/" /overleaf/services/web/app/src/Features/Project/ProjectOptionsHandler.mjs
+    sed -i "s/\\['xelatex', 'pdflatex', 'latex', 'lualatex'\\]/['xelatex', 'pdflatex', 'latex', 'lualatex', 'typst']/" /overleaf/services/web/app/src/Features/Project/ProjectOptionsHandler.mjs; \
+    rm -f /tmp/LatexRunner.js

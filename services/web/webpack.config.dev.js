@@ -89,7 +89,10 @@ module.exports = merge(base, {
     port: parseInt(process.env.PORT, 10) || 3808,
     client: {
       webSocketURL: 'auto://0.0.0.0:0/ws',
-      overlay: process.env.DISABLE_WEBPACK_OVERLAY !== 'true',
+      overlay:
+        process.env.DISABLE_WEBPACK_OVERLAY === 'true'
+          ? false
+          : { errors: true, warnings: false },
     },
     hot: true,
     allowedHosts: '.dev-overleaf.com',
@@ -109,5 +112,9 @@ module.exports = merge(base, {
   ignoreWarnings: [
     // ignore some "Can't resolve '*'" warnings for dynamically-imported optional peer dependencies
     /@ai-sdk\/provider-utils\/dist/,
+    warning =>
+      warning?.module?.resource?.includes('typst_syntax_bg.wasm') &&
+      warning?.message?.includes('target environment does not appear to support') &&
+      warning?.message?.includes('async/await'),
   ],
 })

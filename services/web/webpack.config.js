@@ -97,6 +97,9 @@ module.exports = {
 
     // By default write into js directory
     filename: 'js/[name]-[contenthash].js',
+    environment: {
+      asyncFunction: true,
+    },
   },
 
   optimization: {
