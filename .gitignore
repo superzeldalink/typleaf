@@ -4,3 +4,9 @@
 # user defined files
 .env
 docker-compose.override.yml
+
+# local development artifacts
+node_modules/
+libraries/fetch-utils/node_modules/
+develop/output/
+AGENTS.md
