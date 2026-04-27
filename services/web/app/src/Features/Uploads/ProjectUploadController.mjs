@@ -40,7 +40,19 @@ function uploadProject(req, res, next) {
   const timer = new metrics.Timer('project-upload')
   const userId = SessionManager.getLoggedInUserId(req.session)
   const { path } = req.file
-  const name = Path.basename(req.body.name, '.zip')
+  const uploadedFilename =
+    req.body.name ?? req.body.qqfilename ?? req.file?.originalname
+
+  if (!uploadedFilename) {
+    fs.unlink(path, function () {})
+    timer.done()
+    return res.status(400).json({
+      success: false,
+      error: 'invalid_upload_request',
+    })
+  }
+
+  const name = Path.basename(uploadedFilename, '.zip')
   return ProjectUploadManager.createProjectFromZipArchive(
     userId,
     name,

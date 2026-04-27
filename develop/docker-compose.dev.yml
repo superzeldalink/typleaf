@@ -113,7 +113,13 @@ services:
       - ../services/real-time/config:/overleaf/services/real-time/config
 
   web:
-    command: ["node", "--watch", "app.mjs", "--watch-locales"]
+    user: root
+    command:
+      [
+        "sh",
+        "-lc",
+        "mkdir -p /overleaf/services/web/data/uploads /overleaf/services/web/data/zippedProjects /overleaf/services/web/data/projectHistories /overleaf/services/web/data/pdf /overleaf/services/web/data/logs /overleaf/services/web/data/dumpFolder && chown -R node:node /overleaf/services/web/data && exec su node -s /bin/sh -c 'node --watch app.mjs --watch-locales'",
+      ]
     environment:
       - NODE_OPTIONS=--inspect=0.0.0.0:9229
     ports:
