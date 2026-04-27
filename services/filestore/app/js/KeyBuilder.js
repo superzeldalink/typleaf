@@ -40,7 +40,7 @@ function globalBlobFileKeyMiddleware(req, res, next) {
   req.bucket = settings.filestore.stores.global_blobs
   const { hash } = req.params
   req.key = `${hash.slice(0, 2)}/${hash.slice(2, 4)}/${hash.slice(4)}`
-  req.useSubdirectories = true
+  req.useSubdirectories = settings.filestore.backend !== 'fs'
   next()
 }
 
@@ -48,7 +48,7 @@ function projectBlobFileKeyMiddleware(req, res, next) {
   req.bucket = settings.filestore.stores.project_blobs
   const { historyId, hash } = req.params
   req.key = `${projectKey.format(historyId)}/${hash.slice(0, 2)}/${hash.slice(2)}`
-  req.useSubdirectories = true
+  req.useSubdirectories = settings.filestore.backend !== 'fs'
   next()
 }
 

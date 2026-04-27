@@ -12,6 +12,10 @@ const minutes = 60 * seconds
 const httpAuthUser = process.env.WEB_API_USER
 const httpAuthPass = process.env.WEB_API_PASSWORD
 const httpAuthUsers = {}
+const downloadHost = process.env.DOWNLOAD_HOST || '127.0.0.1'
+const normalizedDownloadHost = /^https?:\/\//.test(downloadHost)
+  ? downloadHost
+  : `http://${downloadHost}:8080`
 if (httpAuthUser && httpAuthPass) {
   httpAuthUsers[httpAuthUser] = httpAuthPass
 }
@@ -243,7 +247,7 @@ module.exports = {
       url: `http://${process.env.CLSI_HOST || '127.0.0.1'}:3013`,
       downloadHost: process.env.CLSI_LB_IP
         ? `http://${process.env.CLSI_LB_IP}:80`
-        : `http://${process.env.DOWNLOAD_HOST || '127.0.0.1'}:8080`,
+        : normalizedDownloadHost,
       backendGroupName: undefined,
       submissionBackendClass:
         process.env.CLSI_SUBMISSION_BACKEND_CLASS || 'c3d',
