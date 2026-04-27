@@ -85,14 +85,25 @@ const buildExtension = (
      * then dispatches an effect so other extensions can update accordingly.
      */
     ViewPlugin.define(view => {
+      let destroyed = false
+
       // load the language asynchronously
       languageDescription.load().then(support => {
+        if (destroyed) {
+          return
+        }
+
         view.dispatch({
           effects: [
             languageConf.reconfigure(support),
             languageLoadedEffect.of(null),
           ],
         })
+
+        if (destroyed) {
+          return
+        }
+
         // Wait until the previous effects have been processed
         view.dispatch({
           effects: [
@@ -102,7 +113,11 @@ const buildExtension = (
         })
       })
 
-      return {}
+      return {
+        destroy() {
+          destroyed = true
+        },
+      }
     }),
     metadataState,
   ]
