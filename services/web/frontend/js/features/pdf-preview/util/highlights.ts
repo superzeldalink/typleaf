@@ -7,7 +7,6 @@ export function buildHighlightElement(
   viewer: PDFViewer,
 ) {
   const { viewport, div } = viewer.getPageView(highlight.page - 1);
-  const isTopLeftOrigin = highlight.origin === "top-left";
 
   // page coordinates from synctex
   const rectangle = {
@@ -23,9 +22,9 @@ export function buildHighlightElement(
   // account for scaling
   const viewportRectangle = viewport.convertToViewportRectangle([
     rectangle.left,
-    isTopLeftOrigin ? rectangle.top : viewBoxHeight - rectangle.bottom,
+    viewBoxHeight - rectangle.bottom,
     rectangle.right,
-    isTopLeftOrigin ? rectangle.bottom : viewBoxHeight - rectangle.top,
+    viewBoxHeight - rectangle.top,
   ]);
 
   // flip top/bottom, left/right if needed

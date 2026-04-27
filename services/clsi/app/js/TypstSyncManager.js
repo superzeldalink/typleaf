@@ -8,8 +8,12 @@ import CommandRunner from "./CommandRunner.js";
 const TYPST_SYNC_MAP = "output.typst-sync.json";
 const TYPST_SYNC_QUERY = ".output.typst-sync.query.typ";
 const TYPST_SYNC_LABEL = "<ol-typst-sync>";
-const DEFAULT_HIGHLIGHT_WIDTH = 140;
-const DEFAULT_HIGHLIGHT_HEIGHT = 28;
+
+const DEFAULT_HIGHLIGHT_SIZE = {
+  heading: { width: 180, height: 30 },
+  paragraph: { width: 220, height: 34 },
+  figure: { width: 220, height: 40 },
+};
 
 function getSyncMapPath(directory) {
   return Path.join(directory, TYPST_SYNC_MAP);
@@ -26,15 +30,6 @@ function parsePt(value) {
   return match ? Number(match[0]) : null;
 }
 
-function normalizeTypstTitle(value) {
-  if (typeof value !== "string") return "";
-  return value.replace(/^\[|\]$/g, "").trim();
-}
-
-function normalizeSourceTitle(value) {
-  return value.trim();
-}
-
 function resolveIncludedPath(baseFile, includePath) {
   const candidate = Path.normalize(
     Path.join(Path.dirname(baseFile), includePath.trim()),
@@ -42,17 +37,112 @@ function resolveIncludedPath(baseFile, includePath) {
   return normalizeProjectPath(candidate);
 }
 
-function getHeadingLevel(line) {
+function normalizeTypstInline(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/^sequence\(/, "")
+    .replace(/\)$/, "")
+    .replace(/\[(.*?)\]/gs, "$1")
+    .replace(/,\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeSourceText(value) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function getHeading(line) {
   const match = line.match(/^(=+)\s+(.*?)\s*$/);
   if (!match || !match[2]) return null;
   return {
+    kind: "heading",
     level: match[1].length,
-    title: normalizeSourceTitle(match[2]),
+    title: normalizeSourceText(match[2]),
   };
 }
 
-async function collectSourceHeadings(compileDir, rootResourcePath) {
-  const headings = [];
+function getFigureStart(trimmed) {
+  return /^#figure\s*\(/.test(trimmed);
+}
+
+function shouldSkipLine(trimmed) {
+  return (
+    trimmed === "" ||
+    trimmed.startsWith("//") ||
+    trimmed === "{" ||
+    trimmed === "}" ||
+    trimmed === "]"
+  );
+}
+
+function getParenDepthDelta(line) {
+  let delta = 0;
+  let insideString = false;
+  let escaped = false;
+
+  for (const char of line) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      insideString = !insideString;
+      continue;
+    }
+    if (insideString) continue;
+    if (char === "(") delta += 1;
+    if (char === ")") delta -= 1;
+  }
+
+  return delta;
+}
+
+function consumeFigureBlock(lines, startIndex) {
+  let depth = 0;
+  let sawOpen = false;
+  let endIndex = startIndex;
+
+  for (let index = startIndex; index < lines.length; index++) {
+    const line = lines[index];
+    depth += getParenDepthDelta(line);
+    if (line.includes("(")) {
+      sawOpen = true;
+    }
+    endIndex = index;
+    if (sawOpen && depth <= 0) {
+      break;
+    }
+  }
+
+  return endIndex;
+}
+
+function isParagraphCandidate(trimmed) {
+  if (shouldSkipLine(trimmed)) return false;
+  if (trimmed.startsWith("#include ")) return false;
+  if (trimmed.startsWith("```")) return false;
+  if (getHeading(trimmed)) return false;
+  if (getFigureStart(trimmed)) return false;
+  return true;
+}
+
+function buildParagraphText(lines) {
+  return normalizeSourceText(
+    lines
+      .map((line) => line.trim())
+      .join(" ")
+      .replace(/#\w+\(/g, "")
+      .replace(/[()[\]{}]/g, " "),
+  );
+}
+
+async function collectSourceBlocks(compileDir, rootResourcePath) {
+  const blocks = [];
 
   async function walk(filePath, stack = []) {
     const normalizedFilePath = normalizeProjectPath(filePath);
@@ -75,6 +165,7 @@ async function collectSourceHeadings(compileDir, rootResourcePath) {
 
       if (trimmed.startsWith("```")) {
         insideCodeFence = !insideCodeFence;
+        continue;
       }
 
       if (insideCodeFence) {
@@ -90,43 +181,102 @@ async function collectSourceHeadings(compileDir, rootResourcePath) {
         continue;
       }
 
-      const heading = getHeadingLevel(line);
-      if (!heading) continue;
+      const heading = getHeading(trimmed);
+      if (heading) {
+        blocks.push({
+          file: normalizedFilePath,
+          line: index + 1,
+          endLine: index + 1,
+          kind: heading.kind,
+          level: heading.level,
+          text: heading.title,
+        });
+        continue;
+      }
 
-      headings.push({
+      if (getFigureStart(trimmed)) {
+        const endIndex = consumeFigureBlock(lines, index);
+        blocks.push({
+          file: normalizedFilePath,
+          line: index + 1,
+          endLine: endIndex + 1,
+          kind: "figure",
+          text: normalizeSourceText(lines.slice(index, endIndex + 1).join(" ")),
+        });
+        index = endIndex;
+        continue;
+      }
+
+      if (!isParagraphCandidate(trimmed)) {
+        continue;
+      }
+
+      const startIndex = index;
+      let endIndex = index;
+      while (endIndex + 1 < lines.length) {
+        const nextTrimmed = lines[endIndex + 1].trim();
+        if (!isParagraphCandidate(nextTrimmed)) {
+          break;
+        }
+        endIndex += 1;
+      }
+
+      blocks.push({
         file: normalizedFilePath,
-        line: index + 1,
-        level: heading.level,
-        title: heading.title,
+        line: startIndex + 1,
+        endLine: endIndex + 1,
+        kind: "paragraph",
+        text: buildParagraphText(lines.slice(startIndex, endIndex + 1)),
       });
+      index = endIndex;
     }
   }
 
   await walk(rootResourcePath);
-  return headings;
+  return blocks;
 }
 
 function buildQueryWrapper(rootResourcePath) {
   return `#include ${JSON.stringify(rootResourcePath)}
 
 #context [
-  #metadata(
-    query(heading).map(h => {
+  #metadata((
+    headings: query(heading).map(h => {
       let loc = h.location()
       let pos = loc.position()
       (
         level: h.level,
-        title: repr(h.body),
+        text: repr(h.body),
         page: counter(page).at(loc).first(),
         x: pos.x,
         y: pos.y,
       )
-    })
-  ) ${TYPST_SYNC_LABEL}
+    }),
+    paragraphs: query(par).map(p => {
+      let loc = p.location()
+      let pos = loc.position()
+      (
+        text: repr(p.body),
+        page: counter(page).at(loc).first(),
+        x: pos.x,
+        y: pos.y,
+      )
+    }),
+    figures: query(figure).map(f => {
+      let loc = f.location()
+      let pos = loc.position()
+      (
+        text: repr(f.caption.body),
+        page: counter(page).at(loc).first(),
+        x: pos.x,
+        y: pos.y,
+      )
+    }),
+  )) ${TYPST_SYNC_LABEL}
 ]`;
 }
 
-async function queryTypstHeadings(
+async function queryTypstBlocks(
   compileName,
   compileDir,
   rootResourcePath,
@@ -158,7 +308,7 @@ async function queryTypstHeadings(
       "typst-sync",
     );
     const result = JSON.parse(stdout);
-    return Array.isArray(result?.[0]?.value) ? result[0].value : [];
+    return result?.[0]?.value || {};
   } catch (error) {
     throw OError.tag(error, "error generating typst sync map", {
       compileDir,
@@ -169,48 +319,92 @@ async function queryTypstHeadings(
   }
 }
 
-function pairHeadings(sourceHeadings, queriedHeadings) {
-  const count = Math.min(sourceHeadings.length, queriedHeadings.length);
+function createEntry(source, query) {
+  const entry = {
+    file: source.file,
+    line: source.line,
+    endLine: source.endLine,
+    kind: source.kind,
+    level: source.level,
+    text: source.text,
+    page: Number(query.page),
+    x: parsePt(query.x),
+    y: parsePt(query.y),
+  };
+  return entry.page && entry.x != null && entry.y != null ? entry : null;
+}
+
+function pairBlocks(sourceBlocks, queriedBlocks) {
+  const sourceByKind = {
+    heading: sourceBlocks.filter((block) => block.kind === "heading"),
+    paragraph: sourceBlocks.filter((block) => block.kind === "paragraph"),
+    figure: sourceBlocks.filter((block) => block.kind === "figure"),
+  };
+
+  const queryByKind = {
+    heading: Array.isArray(queriedBlocks.headings)
+      ? queriedBlocks.headings
+      : [],
+    paragraph: Array.isArray(queriedBlocks.paragraphs)
+      ? queriedBlocks.paragraphs
+      : [],
+    figure: Array.isArray(queriedBlocks.figures) ? queriedBlocks.figures : [],
+  };
+
   const entries = [];
+  for (const kind of ["heading", "paragraph", "figure"]) {
+    const sourceList = sourceByKind[kind];
+    const queryList = queryByKind[kind];
+    const count = Math.min(sourceList.length, queryList.length);
 
-  for (let index = 0; index < count; index++) {
-    const source = sourceHeadings[index];
-    const query = queriedHeadings[index];
-    const entry = {
-      file: source.file,
-      line: source.line,
-      level: source.level,
-      title: source.title,
-      page: Number(query.page),
-      x: parsePt(query.x),
-      y: parsePt(query.y),
-    };
-    if (entry.page && entry.x != null && entry.y != null) {
-      entries.push(entry);
+    if (sourceList.length !== queryList.length) {
+      logger.warn(
+        {
+          kind,
+          sourceBlocks: sourceList.length,
+          queriedBlocks: queryList.length,
+        },
+        "typst sync block count mismatch",
+      );
     }
-  }
 
-  if (sourceHeadings.length !== queriedHeadings.length) {
-    logger.warn(
-      {
-        sourceHeadings: sourceHeadings.length,
-        queriedHeadings: queriedHeadings.length,
-      },
-      "typst sync heading count mismatch",
-    );
-  } else {
-    const mismatches = entries.filter((entry, index) => {
-      const queriedTitle = normalizeTypstTitle(queriedHeadings[index].title);
-      return queriedTitle && queriedTitle !== entry.title;
-    });
+    for (let index = 0; index < count; index++) {
+      const entry = createEntry(sourceList[index], queryList[index]);
+      if (entry) {
+        entries.push(entry);
+      }
+    }
+
+    const mismatches = [];
+    for (let index = 0; index < count; index++) {
+      const sourceText = sourceList[index].text;
+      const queryText = normalizeTypstInline(queryList[index].text);
+      if (
+        sourceText &&
+        queryText &&
+        !sourceText.includes(
+          queryText.slice(0, Math.min(queryText.length, 24)),
+        ) &&
+        !queryText.includes(
+          sourceText.slice(0, Math.min(sourceText.length, 24)),
+        )
+      ) {
+        mismatches.push({
+          source: sourceText,
+          query: queryText,
+        });
+      }
+    }
+
     if (mismatches.length > 0) {
       logger.debug(
-        { mismatches: mismatches.slice(0, 5) },
-        "typst sync title mismatch; using source order",
+        { kind, mismatches: mismatches.slice(0, 5) },
+        "typst sync block text mismatch; using source order",
       );
     }
   }
 
+  entries.sort((left, right) => left.line - right.line);
   return entries;
 }
 
@@ -221,27 +415,24 @@ async function generateSyncMap({
   imageName,
   timeout = 60 * 1000,
 }) {
-  const sourceHeadings = await collectSourceHeadings(
-    compileDir,
-    rootResourcePath,
-  );
-  if (sourceHeadings.length === 0) {
+  const sourceBlocks = await collectSourceBlocks(compileDir, rootResourcePath);
+  if (sourceBlocks.length === 0) {
     await fsPromises.rm(getSyncMapPath(compileDir), { force: true });
     return [];
   }
 
-  const queriedHeadings = await queryTypstHeadings(
+  const queriedBlocks = await queryTypstBlocks(
     compileName,
     compileDir,
     rootResourcePath,
     imageName,
     timeout,
   );
-  const entries = pairHeadings(sourceHeadings, queriedHeadings);
+  const entries = pairBlocks(sourceBlocks, queriedBlocks);
 
   await fsPromises.writeFile(
     getSyncMapPath(compileDir),
-    JSON.stringify({ version: 1, entries }, null, 2),
+    JSON.stringify({ version: 2, entries }, null, 2),
   );
 
   return entries;
@@ -258,6 +449,13 @@ function findCodeAnchor(entries, filename, line) {
   const fileEntries = entries.filter((entry) => entry.file === normalizedFile);
   if (fileEntries.length === 0) return null;
 
+  const containingEntry = fileEntries.find(
+    (entry) => line >= entry.line && line <= (entry.endLine || entry.line),
+  );
+  if (containingEntry) {
+    return containingEntry;
+  }
+
   let best = null;
   for (const entry of fileEntries) {
     if (entry.line <= line) {
@@ -273,12 +471,14 @@ function findCodeAnchor(entries, filename, line) {
 }
 
 function buildPdfHighlight(entry) {
+  const size =
+    DEFAULT_HIGHLIGHT_SIZE[entry.kind] || DEFAULT_HIGHLIGHT_SIZE.paragraph;
   return {
     page: entry.page,
     h: entry.x,
     v: entry.y,
-    width: DEFAULT_HIGHLIGHT_WIDTH,
-    height: DEFAULT_HIGHLIGHT_HEIGHT,
+    width: size.width,
+    height: size.height,
     origin: "top-left",
   };
 }
@@ -320,7 +520,7 @@ async function copySyncMapToBuild(compileDir, outputDir, buildId) {
 
 export default {
   TYPST_SYNC_MAP,
-  collectSourceHeadings,
+  collectSourceBlocks,
   findCodeAnchor,
   findPdfAnchor,
   buildPdfHighlight,
@@ -329,7 +529,7 @@ export default {
   copySyncMapToBuild,
   normalizeProjectPath,
   promises: {
-    collectSourceHeadings,
+    collectSourceBlocks,
     copySyncMapToBuild,
     generateSyncMap,
     loadSyncMap,
