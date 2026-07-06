@@ -59,7 +59,7 @@ function TemplateFormFields({
         />
       </LabeledRowFormGroup>
 
-      <LabeledRowFormGroup controlId="form-category" label={t('category') + ':'}>
+      <LabeledRowFormGroup controlId="form-category" label={t('categories') + ':'}>
         <SettingsTemplateCategory
           value={template.category}
           onChange={val => onChange({ category: val })}
