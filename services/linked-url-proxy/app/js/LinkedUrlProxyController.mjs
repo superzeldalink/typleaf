@@ -6,6 +6,8 @@ import { URL } from 'node:url'
 import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
 import { fetchStreamWithResponse, RequestFailedError } from '@overleaf/fetch-utils'
+import http from 'node:http'
+import https from 'node:https'
 
 function isAllowedResource(targetUrl) {
   if (!Settings.allowedResources) return false
@@ -45,7 +47,7 @@ async function checkUrlAccess(hostname, targetUrl) {
     throw err
   }
 // Permit explicitly allowed resources without checking blocked IPs
-  if (isAllowedResource(targetUrl)) return
+  if (isAllowedResource(targetUrl)) return records[0]
   for (const { address } of records) {
     if (isBlockedIp(address, targetUrl)) {
       const err = new Error(`Blocked IP address: ${address}`)
@@ -53,6 +55,7 @@ async function checkUrlAccess(hostname, targetUrl) {
       throw err
     }
   }
+  return records[0]
 }
 
 async function validateAndFetch(rawUrl, redirectCount = 0) {
@@ -88,12 +91,25 @@ async function validateAndFetch(rawUrl, redirectCount = 0) {
   const normalizedUrl = url.toString()
 
   // check DNS and allowed resources
-  await checkUrlAccess(url.hostname, normalizedUrl)
+  const { address: validatedIp, family } = await checkUrlAccess(
+    url.hostname,
+    normalizedUrl
+  )
+
+  // pin the connection to the validated IP to prevent DNS rebinding (TOCTOU).
+  // node's Happy Eyeballs calls lookup with { all: true } and expects an array.
+  const agent = new (url.protocol === 'https:' ? https : http).Agent({
+    lookup: (_hostname, options, cb) =>
+      options?.all
+        ? cb(null, [{ address: validatedIp, family }])
+        : cb(null, validatedIp, family),
+  })
 
   const opts = {
     redirect: 'manual',
     timeout: Settings.fetchTimeoutMs,
     headers: Settings.userAgentHeader,
+    agent,
   }
 
   try {
