@@ -224,6 +224,7 @@ function _formatTemplateForList(template) {
 
 // imageName: quay.io/sharelatex/texlive-full:2024.1
 function _formatImageNameForPage(imageName) {
+  if (!imageName) return imageName
   return imageName.split("/")[imageName.split("/").length - 1]
 }
 
