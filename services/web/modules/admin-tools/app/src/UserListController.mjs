@@ -354,8 +354,6 @@ function _sortAndPaginate(users, sort, page) {
     throw new OError('Invalid sorting criteria', { sort })
   }
 
-console.log("SORT = ", sort)
-
   const LAST = '\uffff'
   const sortedUsers =
     sort.by === 'name'
