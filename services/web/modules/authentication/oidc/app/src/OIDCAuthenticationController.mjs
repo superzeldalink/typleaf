@@ -2,7 +2,7 @@ import logger from '@overleaf/logger'
 import passport from 'passport'
 import Settings from '@overleaf/settings'
 import AuthenticationController from '../../../../../app/src/Features/Authentication/AuthenticationController.mjs'
-import UserController from '../../../../../app/src/Features/User/UserController.mjs'
+import { endSession } from '../../../logout.mjs'
 import ThirdPartyIdentityManager from '../../../../../app/src/Features/User/ThirdPartyIdentityManager.mjs'
 import OIDCAuthenticationManager from './OIDCAuthenticationManager.mjs'
 
@@ -41,7 +41,7 @@ const OIDCAuthenticationController = {
           }
         } else {
           if (info.redir != null) {
-            await UserController.doLogout(req)
+            await endSession(req)
             return res.redirect(info.redir)
           } else {
             res.status(info.status || 401)
@@ -157,7 +157,7 @@ const OIDCAuthenticationController = {
   async passportLogout(req, res, next) {
 // TODO: instead of storing idToken in session, use refreshToken to obtain a new idToken?
     const idTokenHint = req.session.idToken
-    await UserController.doLogout(req)
+    await endSession(req)
     const logoutUrl = process.env.OVERLEAF_OIDC_LOGOUT_URL
     const redirectUri = Settings.siteUrl
     res.redirect(`${logoutUrl}?id_token_hint=${idTokenHint}&post_logout_redirect_uri=${encodeURIComponent(redirectUri)}`)
