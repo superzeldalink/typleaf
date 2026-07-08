@@ -110,13 +110,15 @@ const DockerRunner = {
               options,
               volumes,
               timeout,
-              callback
+              callback,
+              compileGroup
             )
           })
         } else {
           callback(error, output)
         }
-      }
+      },
+      compileGroup
     )
 
     // pass back the container name to allow it to be killed
@@ -147,16 +149,20 @@ const DockerRunner = {
     })
   },
 
-  _runAndWaitForContainer(options, volumes, timeout, _callback) {
+  // compileGroup trails the callback so existing positional test stubs
+  // (callsArgWith(3, ...)) keep working; omitting it preserves old behaviour.
+  _runAndWaitForContainer(options, volumes, timeout, _callback, compileGroup) {
     const callback = _.once(_callback)
     const { name } = options
 
     let streamEnded = false
     let containerReturned = false
     let output = {}
+    let containerExitCode
 
     function callbackIfFinished() {
       if (streamEnded && containerReturned) {
+        output.exitCode = containerExitCode
         callback(null, output)
       }
     }
@@ -193,12 +199,16 @@ const DockerRunner = {
               err.terminated = true
               return callback(err)
             }
-            if (exitCode === 1) {
-              // exit status from chktex
+            if (exitCode === 1 && compileGroup !== 'conversions') {
+              // exit status from chktex (a benign lint exit). Pandoc
+              // 'conversions' also exit 1 for real IO errors, so let those
+              // propagate normally — ConversionManager turns them into a
+              // user-facing 422 with stderr instead of a generic server error.
               const err = new Error('exited')
               err.code = exitCode
               return callback(err)
             }
+            containerExitCode = exitCode
             containerReturned = true
             logger.debug(
               // The seccomp policy is very large. Avoid logging it. _.omit deep clones.
