@@ -73,15 +73,17 @@ function citeBraceRange(state: EditorState) {
 function computeHint(state: EditorState, previous: HintState): HintState {
   const range = citeBraceRange(state)
   if (!range) return null
+  // Anchor the hint to the opening brace of \cite{…} (range.from) instead of the
+  // caret, so it stays put while the user types keys inside the braces.
   // reuse the tooltip while inside the same cite argument to avoid flicker
   if (previous && previous.from === range.from && previous.to === range.to) {
-    return { ...previous, tooltip: { ...previous.tooltip, pos: range.pos } }
+    return { ...previous, tooltip: { ...previous.tooltip, pos: range.from } }
   }
   return {
     from: range.from,
     to: range.to,
     tooltip: {
-      pos: range.pos,
+      pos: range.from,
       above: false,
       create: view => createHintTooltipView(view),
     },
