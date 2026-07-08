@@ -188,7 +188,7 @@ export async function deleteTemplateAssets(templateId, version, deleteFromDb) {
     try {
       await Template.deleteOne({ _id: templateId }).exec()
     } catch (error) {
-      logger.error({ err, templateId }, 'Failed to delete template from MongoDB')
+      logger.error({ error, templateId }, 'Failed to delete template from MongoDB')
       throw error
     }
   }
