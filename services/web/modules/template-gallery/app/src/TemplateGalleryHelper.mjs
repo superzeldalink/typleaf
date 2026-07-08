@@ -62,21 +62,20 @@ export function validateTemplateInput({ name, descriptionMD, authorMD, license }
 }
 
 export async function canUserOverrideTemplate(template, userId) {
-  let templateOwnerId = template.owner
+  const templateOwnerId = template.owner
   let templateOwnerName = 'you'
-  let userIsOwner = true
-  let userIsAdmin
+  let userIsAdmin = false
+  try {
+    userIsAdmin = (await UserGetter.promises.getUser(userId, { isAdmin: 1 })).isAdmin
+  } catch (error) {
+    logger.error({ error, userId }, 'Logged in user does not exist, strange...')
+  }
   if (templateOwnerId != userId) {
-    userIsOwner = false
-    try {
-      userIsAdmin = (await UserGetter.promises.getUser(userId, { isAdmin: 1 })).isAdmin
-    } catch (error) {
-      logger.error({ error, userId }, 'Logged in user does not exist, strange...')
-      userIsAdmin = false
-    }
     templateOwnerName = await getUserName(templateOwnerId) || 'unknown'
   }
-  const canOverride = userIsOwner || userIsAdmin
+  // Reachable only after ensureUserCanManageTemplates; override authority is
+  // exactly the two sanctioned sources: site admin, or the configured templates user.
+  const canOverride = userIsAdmin || settings.templates?.user_id === userId
   return { canOverride, templateOwnerName }
 }
 
