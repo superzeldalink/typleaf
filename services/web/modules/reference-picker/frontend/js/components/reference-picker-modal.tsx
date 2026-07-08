@@ -110,9 +110,9 @@ export default function ReferencePickerModal({
       setResults(r.hits)
 
       if (pendingInitialKeysRef.current.length > 0) {
-        const knownKeys = new Set(r.hits.map(h => h._source.EntryKey))
-        const matched = pendingInitialKeysRef.current.filter(k => knownKeys.has(k))
-        if (matched.length > 0) setSelectedKeys(matched)
+        // Preserve every existing key, even ones the local index can't resolve
+        // (stale/oversized .bib, unresolved refs); otherwise Replace silently drops them.
+        setSelectedKeys(pendingInitialKeysRef.current)
         pendingInitialKeysRef.current = []
       }
     }
