@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
 import type { LinkedFile, LinkedFileData } from '@/features/file-view/types/binary-file'
 import { hasProvider } from '@/features/file-view/types/binary-file'
+import useInstanceFeatures from '@modules/instance-features/frontend/js/use-instance-features'
 
 type TPRFileViewRefreshButtonProps = {
   file: LinkedFile<keyof LinkedFileData>
@@ -20,8 +21,16 @@ export function TPRFileViewRefreshButton({
   refreshing,
 }: TPRFileViewRefreshButtonProps) {
   const { t } = useTranslation()
+  const { zotero } = useInstanceFeatures()
   const importedByUserId = (file.linkedFileData as any)?.importedByUserId
   const zoteroIsProvider = hasProvider(file, 'zotero')
+
+  // Hide the refresh button only for Zotero files when Zotero is disabled;
+  // other providers (url, mendeley, …) still get their button.
+  if (zoteroIsProvider && !zotero) {
+    return null
+  }
+
   const disabled = (zoteroIsProvider && !importedByUserId) ? true : false
 
   return (

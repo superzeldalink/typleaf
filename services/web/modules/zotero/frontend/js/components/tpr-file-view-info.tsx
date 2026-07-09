@@ -3,6 +3,7 @@ import { formatTime, relativeDate } from '@/features/utils/format-date'
 import { LinkedFileIcon } from '@/features/file-view/components/file-view-icons'
 import { hasProvider } from '@/features/file-view/types/binary-file'
 import type { LinkedFile, LinkedFileData } from '@/features/file-view/types/binary-file'
+import useInstanceFeatures from '@modules/instance-features/frontend/js/use-instance-features'
 
 type TPRFileViewInfoProps = {
   file: LinkedFile<keyof LinkedFileData>
@@ -15,8 +16,9 @@ type TPRFileViewInfoProps = {
  */
 export function TPRFileViewInfo({ file }: TPRFileViewInfoProps) {
   const { t } = useTranslation()
+  const { zotero } = useInstanceFeatures()
 
-  if (!hasProvider(file, 'zotero')) return null
+  if (!zotero || !hasProvider(file, 'zotero')) return null
 
   const importedAt = (file.linkedFileData as any)?.importedAt || file.created
   const formattedDate = formatTime(importedAt)

@@ -12,6 +12,7 @@ import {
   OLModalTitle,
 } from '@/shared/components/ol/ol-modal'
 import ZoteroLogo from '@/shared/svgs/zotero-logo'
+import useInstanceFeatures from '@modules/instance-features/frontend/js/use-instance-features'
 
 /**
  * Zotero account linking widget for the Account Settings page.
@@ -23,7 +24,7 @@ import ZoteroLogo from '@/shared/svgs/zotero-logo'
  *
  * Registered via overleafModuleImports.referenceLinkingWidgets.
  */
-export default function ZoteroWidget() {
+function ZoteroWidgetInner() {
   const { t } = useTranslation()
   const user = getMeta('ol-user')
   const refProviders = user?.refProviders || {}
@@ -135,4 +136,13 @@ export default function ZoteroWidget() {
       </OLModal>
     </div>
   )
+}
+
+// Hide the Zotero linking widget when Zotero is disabled on this instance.
+export default function ZoteroWidget() {
+  const { zotero } = useInstanceFeatures()
+  if (!zotero) {
+    return null
+  }
+  return <ZoteroWidgetInner />
 }

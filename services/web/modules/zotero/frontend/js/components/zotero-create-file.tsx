@@ -11,6 +11,7 @@ import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
 import OLNotification from '@/shared/components/ol/ol-notification'
+import useInstanceFeatures from '@modules/instance-features/frontend/js/use-instance-features'
 
 type ZoteroGroup = {
   id: string
@@ -19,10 +20,11 @@ type ZoteroGroup = {
 
 export function CreateFileMode() {
   const { t } = useTranslation()
+  const { zotero } = useInstanceFeatures()
   const { refProviders } = useFileTreeMainContext()
   const isLinked = (refProviders as Record<string, boolean>)?.zotero
 
-  if (!isLinked) {
+  if (!zotero || !isLinked) {
     return null
   }
 
@@ -36,9 +38,10 @@ export function CreateFileMode() {
 }
 
 export function CreateFilePane() {
+  const { zotero } = useInstanceFeatures()
   const { newFileCreateMode } = useFileTreeActionable()
 
-  if (newFileCreateMode !== 'zotero') {
+  if (!zotero || newFileCreateMode !== 'zotero') {
     return null
   }
 

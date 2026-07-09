@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import ZoteroLogo from '@/shared/svgs/zotero-logo'
 import IntegrationCard from '@/features/integrations-panel/integration-card'
+import useInstanceFeatures from '@modules/instance-features/frontend/js/use-instance-features'
 
 /**
  * Zotero card in the editor's Integrations panel. Clicking it takes the user to
@@ -11,6 +12,11 @@ import IntegrationCard from '@/features/integrations-panel/integration-card'
  */
 const ZoteroIntegrationCard = () => {
   const { t } = useTranslation()
+  const { zotero } = useInstanceFeatures()
+
+  if (!zotero) {
+    return null
+  }
 
   return (
     <IntegrationCard

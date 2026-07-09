@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import OLNotification from '@/shared/components/ol/ol-notification'
 import type { LinkedFile, LinkedFileData } from '@/features/file-view/types/binary-file'
 import { hasProvider } from '@/features/file-view/types/binary-file'
+import useInstanceFeatures from '@modules/instance-features/frontend/js/use-instance-features'
 
 type TPRFileViewRefreshErrorProps = {
   file: LinkedFile<keyof LinkedFileData>
@@ -17,6 +18,13 @@ export function TPRFileViewRefreshError({
   refreshError,
 }: TPRFileViewRefreshErrorProps) {
   const { t } = useTranslation()
+  const { zotero } = useInstanceFeatures()
+
+  // Suppress the Zotero-specific error UI for Zotero files when Zotero is
+  // disabled; other providers still surface their refresh errors.
+  if (hasProvider(file, 'zotero') && !zotero) {
+    return null
+  }
 
   let message = refreshError
 
