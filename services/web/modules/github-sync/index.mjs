@@ -1,14 +1,14 @@
 import Settings from '@overleaf/settings'
 import Modules from '../../app/src/infrastructure/Modules.mjs'
 import logger from '@overleaf/logger'
-import GitHubSyncRouter from './app/src/GitHubSyncRouter.mjs'
-import SyncStateManager from './app/src/SyncStateManager.mjs'
-import TokenManager from './app/src/TokenManager.mjs'
 
 let GitHubSyncModule = {}
 if (process.env.GITHUB_SYNC_ENABLED?.toLowerCase() === 'true') {
   logger.debug({}, 'Enabling GitHub Sync module')
-/*
+
+  // Import lazily so these modules are only evaluated when GitHub Sync is enabled.
+  // TokenManager builds an AccessTokenEncryptor at import time (requiring
+  // GITHUB_TOKEN_CIPHER_PASSWORD)
   const [{ default: GitHubSyncRouter },
          { default: SyncStateManager },
          { default: TokenManager }
@@ -18,7 +18,6 @@ if (process.env.GITHUB_SYNC_ENABLED?.toLowerCase() === 'true') {
       import('./app/src/SyncStateManager.mjs'),
       import('./app/src/TokenManager.mjs'),
     ])
-*/
 
   // Delete project sync state from mongo (hook 'projectExpired')
 
