@@ -10,9 +10,9 @@ const { normalizeQuery } = Mongo
 
 // encrypt / decrypt helpers
 const accessTokenEncryptor = new AccessTokenEncryptor({
-  cipherLabel: process.env.GITHUB_TOKEN_CIPHER_LABEL || "OL_CEP-v3",
+  cipherLabel: process.env.GITHUB_TOKEN_CIPHER_LABEL || "2026.3-v3",
   cipherPasswords: {
-    [process.env.GITHUB_TOKEN_CIPHER_LABEL || "OL_CEP-v3"]: process.env.GITHUB_TOKEN_CIPHER_PASSWORD,
+    [process.env.GITHUB_TOKEN_CIPHER_LABEL || "2026.3-v3"]: process.env.GITHUB_TOKEN_CIPHER_PASSWORD,
   },
 })
 
