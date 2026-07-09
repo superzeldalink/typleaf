@@ -14,8 +14,9 @@ import {
 } from '@/shared/components/ol/ol-modal'
 import OLNotification from '@/shared/components/ol/ol-notification'
 import GithubLogo from '@/shared/svgs/github-logo'
+import useInstanceFeatures from '@modules/instance-features/frontend/js/use-instance-features'
 
-export const GitHubSyncWidget = function GitHubSyncWidget() {
+const GitHubSyncWidgetInner = function GitHubSyncWidget() {
   const { t } = useTranslation()
   const { appName } = getMeta('ol-ExposedSettings')
 
@@ -171,4 +172,13 @@ export const GitHubSyncWidget = function GitHubSyncWidget() {
       </OLModal>
     </>
   )
+}
+
+// Hide the widget entirely when GitHub Sync is disabled
+export const GitHubSyncWidget = function GitHubSyncWidget() {
+  const { githubSync } = useInstanceFeatures()
+  if (!githubSync) {
+    return null
+  }
+  return <GitHubSyncWidgetInner />
 }

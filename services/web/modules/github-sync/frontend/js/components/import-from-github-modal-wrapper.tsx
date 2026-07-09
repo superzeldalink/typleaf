@@ -7,6 +7,7 @@ import {
   getJSON,
 } from '@/infrastructure/fetch-json'
 import getMeta from '@/utils/meta'
+import useInstanceFeatures from '@modules/instance-features/frontend/js/use-instance-features'
 import {
   OLModal,
   OLModalBody,
@@ -203,6 +204,10 @@ function ImportFromGitHubModalContent({ handleHide }: { handleHide: () => void }
 }
 
 export default function ImportFromGitHubModal({ onHide }: { onHide: () => void }) {
+  const { githubSync } = useInstanceFeatures()
+  if (!githubSync) {
+    return null
+  }
   return (
     <OLModal
       id="git-import-modal"

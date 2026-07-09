@@ -5,13 +5,19 @@ import GithubLogo from '@/shared/svgs/github-logo'
 import IntegrationCard from '@/features/integrations-panel/integration-card'
 import GitSyncModal from './modals/git-sync-modal'
 import { GitSyncModalStatus } from '../types/git-sync-types'
+import useInstanceFeatures from '@modules/instance-features/frontend/js/use-instance-features'
 
 const GitHubSyncCard = () => {
   const { t } = useTranslation()
+  const { githubSync } = useInstanceFeatures()
 
   const [showModal, setShowModal] = useState(false)
   const { projectId, name } = useProjectContext()
   const [modalStatus, setModalStatus] = useState<GitSyncModalStatus>('loading')
+
+  if (!githubSync) {
+    return null
+  }
 
   return (
     <>
