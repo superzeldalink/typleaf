@@ -72,8 +72,6 @@ The code in this repository is released under the GNU AFFERO GENERAL PUBLIC LICE
 
 ## Star History
 
-## Star History
-
 <a href="https://www.star-history.com/?repos=ayaka-notes%2Foverleaf-pro&type=date&legend=top-left">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=ayaka-notes/overleaf-pro&type=date&theme=dark&legend=top-left&sealed_token=iMOB73kcExYo0bz6-pBM3lDoqj4ZzBFY9T8sqLHfpyyS-prxNb1332SQ2VhE6Jc8jE55Pu4yomIsHRPHNL8cwwck2w3LvbyoYxReMwSn_rutai8Hlk2oy_JluEe1Pumqboxg6rARw13GtG_KHr9Eq0rDb50lEAn3TE05eBpAwtTWnS-mkPXQshxJhpMe" />
