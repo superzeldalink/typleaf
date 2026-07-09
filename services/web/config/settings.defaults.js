@@ -1240,7 +1240,8 @@ module.exports = {
     'reference-picker',
     'git-bridge',
     'github-sync',
-    'zotero'
+    'zotero',
+    'instance-features'
   ],
   viewIncludes: {},
 
