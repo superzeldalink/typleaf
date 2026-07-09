@@ -1,15 +1,15 @@
 <h1 align="center">
   <br>
-  <a href="https://www.overleaf.com"><img src="doc/logo.png" alt="Overleaf" width="300"></a>
+  <a href="https://overleaf-pro.ayaka.space"><img src="doc/logo.png" alt="Overleaf Pro" width="300"></a>
 </h1>
 
-<h4 align="center">An open-source online real-time collaborative LaTeX editor.</h4>
+<h4 align="center">Overleaf Community Edition enhanced with all Pro features <br/>(open source, free to use, self-hostable).</h4>
 
 <p align="center">
-  <a href="https://github.com/overleaf/overleaf/wiki">Wiki</a> •
-  <a href="https://www.overleaf.com/for/enterprises">Server Pro</a> •
-  <a href="#contributing">Contributing</a> •
-  <a href="https://mailchi.mp/overleaf.com/community-edition-and-server-pro">Mailing List</a> •
+  <a href="https://overleaf-pro.ayaka.space">Documents</a> •
+  <a href="https://github.com/orgs/ayaka-notes/packages/container/package/overleaf-pro">Docker Image</a> •
+  <a href="https://github.com/ayaka-notes/texlive-full">TeXLive</a> •
+  <a href="https://overleaf-pro.ayaka.space/dev">Developer</a> •
   <a href="#authors">Authors</a> •
   <a href="#license">License</a>
 </p>
@@ -22,66 +22,37 @@
 ## Overleaf Pro Edition
 Overleaf Pro is an enhanced version of Overleaf with almost all features and capabilities. For details, please check [Overleaf Pro](https://overleaf-pro.ayaka.space) page. Features in Overleaf Pro include: 
 
-- GitHub Sync in 2-ways (Features in SaaS)
+- Pandoc Import/Export (Features in SaaS Platform)
+- Python Script Runner (Features in SaaS Platform)
+- 2-way GitHub Sync (Features in SaaS Platform)
+- Zotero Integration(With Zotero OAuth Support)
+- Advanced Reference Search (Features in SaaS Platform)
 - Git-Bridge Support (Features in Server Pro)
-- Admin Panel (User/Project management)
+- Admin Panel (Global Users/Projects management)
 - SSO with LDAP and SAML or OAuth 2.0
 - Unlimited Compile Times (Adjustable in admin panel)
 - Self Register (Optional, can be limited by mail domain)
-- Sandbox Compile (With [texlive-full](https://github.com/ayaka-notes/texlive-full) Image Support)
+- Sandbox Compile (With [texlive-full](https://github.com/ayaka-notes/texlive-full) image support)
 - Template System (With Template Gallery)
 - Track Changes (With Review and Comment Panel)
-- Full Project History
-- Symbol Palette
-- ARM Support
+- Full Project History(With Restore and Download)
+- Symbol Palette (From [Overleaf SaaS](https://docs.overleaf.com/writing-and-editing/inserting-symbols) feature)
+- ARM Support(x86_64/arm64 on Docker)
 
 Last but not least, Overleaf Pro is open-source, free to use and modify. You can self-host it and contribute to the development of Overleaf Pro. For more details, please check [Developer Documentation](https://overleaf-pro.ayaka.space/dev) page.
 
-## Community Edition
-
-[Overleaf](https://www.overleaf.com) is an open-source online real-time collaborative LaTeX editor. We run a hosted version at [www.overleaf.com](https://www.overleaf.com), but you can also run your own local version, and contribute to the development of Overleaf.
-
-> [!CAUTION]
-> Overleaf Community Edition is intended for use in environments where **all** users are trusted. Community Edition is **not** appropriate for scenarios where isolation of users is required due to Sandbox Compiles not being available. When not using Sandboxed Compiles, users have full read and write access to the `sharelatex` container resources (filesystem, network, environment variables) when running LaTeX compiles.
-
-For more information on Sandbox Compiles check out our [documentation](https://docs.overleaf.com/on-premises/configuration/overleaf-toolkit/server-pro-only-configuration/sandboxed-compiles).
-
-## Enterprise
-
-If you want help installing and maintaining Overleaf in your lab or workplace, we offer an officially supported version called [Overleaf Server Pro](https://www.overleaf.com/for/enterprises). It also includes more features for security (SSO with LDAP or SAML), administration and collaboration (e.g. tracked changes). [Find out more!](https://www.overleaf.com/for/enterprises)
-
-## Keeping up to date
-
-Sign up to the [mailing list](https://mailchi.mp/overleaf.com/community-edition-and-server-pro) to get updates on Overleaf releases and development.
+> [!NOTE]
+> Note: Overleaf Pro is not affiliated with Overleaf, Inc. or its parent company, Digital Science. It is also *not Server Pro* Edition, which is a commercial product offered by Overleaf, Inc.
+> 
+> Overleaf Pro is an independent project developed and maintained by the [ayaka-notes](https://github.com/ayaka-notes).
 
 ## Installation
 
-We have detailed installation instructions in the [Overleaf Toolkit](https://github.com/overleaf/toolkit/).
+We have detailed installation instructions on the [Documents](https://overleaf-pro.ayaka.space/docs) page. We highly recommend installing Overleaf Pro using the [ayaka-notes/Toolkit](https://github.com/ayaka-notes/toolkit/).
 
 ## Upgrading
 
-If you are upgrading from a previous version of Overleaf, please see the [Release Notes section on the Wiki](https://github.com/overleaf/overleaf/wiki#release-notes) for all of the versions between your current version and the version you are upgrading to.
-
-## Overleaf Docker Image
-
-This repo contains two dockerfiles, [`Dockerfile-base`](server-ce/Dockerfile-base), which builds the
-`sharelatex/sharelatex-base` image, and [`Dockerfile`](server-ce/Dockerfile) which builds the
-`sharelatex/sharelatex` (or "community") image.
-
-The Base image generally contains the basic dependencies like `wget`, plus `texlive`.
-We split this out because it's a pretty heavy set of
-dependencies, and it's nice to not have to rebuild all of that every time.
-
-The `sharelatex/sharelatex` image extends the base image and adds the actual Overleaf code
-and services.
-
-Use `make build-base` and `make build-community` from `server-ce/` to build these images.
-
-We use the [Phusion base-image](https://github.com/phusion/baseimage-docker)
-(which is extended by our `base` image) to provide us with a VM-like container
-in which to run the Overleaf services. Baseimage uses the `runit` service
-manager to manage services, and we add our init-scripts from the `server-ce/runit`
-folder.
+If you are upgrading from a previous version of Overleaf Pro, please see the [Releases page](https://github.com/ayaka-notes/overleaf-pro/releases) for the changes in each version between your current version and the one you are upgrading to.
 
 ## Contributing
 
@@ -89,14 +60,24 @@ Please see the [CONTRIBUTING](CONTRIBUTING.md) file for information on contribut
 
 ## Authors
 
-[The Overleaf Team](https://www.overleaf.com/about)
+- [The Overleaf Team](https://www.overleaf.com/about)
+- [Features and Copyright](https://overleaf-pro.ayaka.space/on-premises/readme/features-and-copyright)
 
 ## License
 
 The code in this repository is released under the GNU AFFERO GENERAL PUBLIC LICENSE, version 3. A copy can be found in the [`LICENSE`](LICENSE) file.
 
-Copyright (c) Overleaf, 2014-2025.
+- Copyright (c) Overleaf, 2014-2025.
+- Copyright (c) [Pro Authors](https://overleaf-pro.ayaka.space/on-premises/readme/features-and-copyright), 2026-now.
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/image?repos=ayaka-notes/overleaf-pro&type=timeline&legend=top-left)](https://www.star-history.com/?repos=ayaka-notes%2Foverleaf-pro&type=timeline&legend=top-left)
+## Star History
+
+<a href="https://www.star-history.com/?repos=ayaka-notes%2Foverleaf-pro&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=ayaka-notes/overleaf-pro&type=date&theme=dark&legend=top-left&sealed_token=iMOB73kcExYo0bz6-pBM3lDoqj4ZzBFY9T8sqLHfpyyS-prxNb1332SQ2VhE6Jc8jE55Pu4yomIsHRPHNL8cwwck2w3LvbyoYxReMwSn_rutai8Hlk2oy_JluEe1Pumqboxg6rARw13GtG_KHr9Eq0rDb50lEAn3TE05eBpAwtTWnS-mkPXQshxJhpMe" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=ayaka-notes/overleaf-pro&type=date&legend=top-left&sealed_token=iMOB73kcExYo0bz6-pBM3lDoqj4ZzBFY9T8sqLHfpyyS-prxNb1332SQ2VhE6Jc8jE55Pu4yomIsHRPHNL8cwwck2w3LvbyoYxReMwSn_rutai8Hlk2oy_JluEe1Pumqboxg6rARw13GtG_KHr9Eq0rDb50lEAn3TE05eBpAwtTWnS-mkPXQshxJhpMe" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=ayaka-notes/overleaf-pro&type=date&legend=top-left&sealed_token=iMOB73kcExYo0bz6-pBM3lDoqj4ZzBFY9T8sqLHfpyyS-prxNb1332SQ2VhE6Jc8jE55Pu4yomIsHRPHNL8cwwck2w3LvbyoYxReMwSn_rutai8Hlk2oy_JluEe1Pumqboxg6rARw13GtG_KHr9Eq0rDb50lEAn3TE05eBpAwtTWnS-mkPXQshxJhpMe" />
+ </picture>
+</a>
