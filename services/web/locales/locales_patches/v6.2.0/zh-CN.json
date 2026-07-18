@@ -1234,7 +1234,7 @@
   "imported_from_papers_at_date": "从 __formattedDate__ __relativeDate__ 的论文导入",
   "imported_from_the_output_of_another_project_at_date": "于 __formattedDate__ __relativeDate__，从<0>另一个项目</0>的输出导入: __sourceOutputFilePathHTML__",
   "imported_from_zotero_at_date": "于 __formattedDate__ __relativeDate__，从Zotero导入",
-  "importing": "正在倒入",
+  "importing": "正在导入",
   "importing_and_merging_changes_in_github": "正在导入合并GitHub中的更改",
   "in_order_to_have_a_secure_account_make_sure_your_password": "为了确保您的帐户安全，请确保您的新密码：",
   "in_order_to_match_institutional_metadata_2": "为了匹配您的机构元数据，我们使用 <0>__email__</0> 关联您的帐户。",
