@@ -2,6 +2,7 @@
 
 import { UserFeatureUsage } from '../../models/UserFeatureUsage.mjs'
 import { TooManyRequestsError } from '../../Features/Errors/Errors.js'
+import UserAuditLogHandler from '../../Features/User/UserAuditLogHandler.mjs'
 
 const PERIOD = 24 // hours
 const PERIOD_IN_MILLISECONDS = PERIOD * 60 * 60 * 1000
@@ -20,7 +21,7 @@ export default class FeatureUsageRateLimiter {
     this.featureName = featureName
   }
 
-  _resetFeatureUsagePipelineSection() {
+  resetFeatureUsagePipelineSection() {
     return {
       $set: {
         features: {
@@ -53,16 +54,17 @@ export default class FeatureUsageRateLimiter {
   /**
    *
    * @param {string} userId
-   * @param {number} cost - the amount to increment the users usage by, may be 0 for features that are quota locked but dont consume any uses
    * @param {import('express').Response} res
+   * @param {number} [cost] - the amount to increment the users usage by, may be 0 for features that are quota locked but dont consume any uses
+   * @param {{ auditLogTool?: string }} [options] - if `auditLogTool` is set, an `ai-quota-breach` audit log entry is written with `{ tool }` in the info payload when this request lands at or past the allowance (covers both the just-exhausted and over-the-limit cases)
    */
-  async useFeature(userId, res, cost = 1) {
+  async useFeature(userId, res, cost = 1, options = {}) {
     const allowance = await this._getAllowance(userId)
 
     const featureUsages = await UserFeatureUsage.findOneAndUpdate(
       { _id: userId },
       [
-        this._resetFeatureUsagePipelineSection(),
+        this.resetFeatureUsagePipelineSection(),
         {
           $set: {
             features: {
@@ -95,6 +97,17 @@ export default class FeatureUsageRateLimiter {
       ] ?? {}
 
     setRateLimitHeaders(res, featureUsage, allowance)
+
+    if (options.auditLogTool && (featureUsage.usage ?? 0) >= allowance) {
+      UserAuditLogHandler.addEntryInBackground(
+        userId,
+        'ai-quota-breach',
+        userId,
+        res.req?.ip,
+        { tool: options.auditLogTool }
+      )
+    }
+
     this._checkRateLimit(featureUsage, allowance)
   }
 
@@ -108,7 +121,7 @@ export default class FeatureUsageRateLimiter {
     const featureUsages = await UserFeatureUsage.findOneAndUpdate(
       { _id: userId },
       [
-        this._resetFeatureUsagePipelineSection(),
+        this.resetFeatureUsagePipelineSection(),
         {
           $set: {
             [`features.${this.featureName}.usage`]: {
@@ -128,6 +141,24 @@ export default class FeatureUsageRateLimiter {
         this.featureName
       ] ?? {}
     setRateLimitHeaders(res, featureUsage, allowance)
+  }
+
+  /**
+   * @param {string} userId
+   */
+  async resetFeatureUsage(userId) {
+    await UserFeatureUsage.findOneAndUpdate(
+      { _id: userId },
+      {
+        $set: {
+          [`features.${this.featureName}`]: {
+            usage: 0,
+            periodStart: new Date(),
+          },
+        },
+      },
+      { upsert: true }
+    ).exec()
   }
 
   /**

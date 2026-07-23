@@ -1,5 +1,6 @@
 import mongoose from '../infrastructure/Mongoose.mjs'
 import _ from 'lodash'
+import settings from '@overleaf/settings'
 import { FolderSchema } from './Folder.mjs'
 import Errors from '../Features/Errors/Errors.js'
 
@@ -88,6 +89,7 @@ export const ProjectSchema = new Schema(
         zipFileArchivedInProject: { type: Boolean },
         rangesSupportEnabled: { type: Boolean },
         otMigrationStage: { type: Number },
+        lastResyncedAt: { type: Date },
       },
       isDebugCopyOf: { type: ObjectId },
     },

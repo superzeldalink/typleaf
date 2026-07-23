@@ -65,6 +65,11 @@ function parse(body, callback) {
         type: 'number',
       }
     )
+    response.enableCheckpoint = _parseAttribute(
+      'enableCheckpoint',
+      compile.options.enableCheckpoint,
+      { default: false, type: 'boolean' }
+    )
     response.timeout = _parseAttribute('timeout', compile.options.timeout, {
       default: MAX_TIMEOUT,
       type: 'number',
@@ -162,6 +167,7 @@ function parse(body, callback) {
     // The snapshot and changes are validated when loading them in editor-core.
     response.rawSnapshot = compile.rawSnapshot
     response.rawChangeOperations = compile.rawChangeOperations
+    response.isCompileFromHistory = !!response.rawChangeOperations
 
     // v1 conversions / submissions
     if (compile.filestoreBlobPrefix) {

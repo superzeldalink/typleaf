@@ -2,6 +2,7 @@
 import { UserFeatureUsage } from '../../models/UserFeatureUsage.mjs'
 import { TooManyRequestsError } from '../../Features/Errors/Errors.js'
 import AnalyticsManager from '../../Features/Analytics/AnalyticsManager.mjs'
+import UserAuditLogHandler from '../../Features/User/UserAuditLogHandler.mjs'
 /** @typedef {{usage?: number | null, periodStart?: Date | null}} FeatureUsage */
 /** @typedef {{remainingTokens?: number | null, periodStart?: Date | null}} RemainingTokens */
 
@@ -18,7 +19,7 @@ export default class TokenUsageRateLimiter {
     this.featureName = featureName
   }
 
-  _resetFeatureUsagePipelineSection() {
+  resetTokenUsagePipelineSection() {
     return {
       $set: {
         features: {
@@ -61,15 +62,16 @@ export default class TokenUsageRateLimiter {
    * @param {any} userId
    * @param {any} res
    * @param {any} amount
+   * @param {{ auditLogTool?: string }} [options] - if `auditLogTool` is set, an `ai-quota-breach` audit log entry is written with `{ tool }` in the info payload when this recording crosses or sits past the allowance
    */
-  async recordUsage(userId, res, amount) {
+  async recordUsage(userId, res, amount, options = {}) {
     const allowance = await this._getAllowance(userId)
 
     /** @type {any} */
     const featureUsages = await UserFeatureUsage.findOneAndUpdate(
       { _id: userId },
       [
-        this._resetFeatureUsagePipelineSection(),
+        this.resetTokenUsagePipelineSection(),
         {
           $set: {
             features: {
@@ -90,6 +92,34 @@ export default class TokenUsageRateLimiter {
 
     const featureUsage = featureUsages.features?.[this.featureName] ?? {}
     this.setRateLimitHeaders(res, featureUsage, allowance)
+
+    if (options.auditLogTool && (featureUsage.usage ?? 0) >= allowance) {
+      UserAuditLogHandler.addEntryInBackground(
+        userId,
+        'ai-quota-breach',
+        userId,
+        res.req?.ip,
+        { tool: options.auditLogTool }
+      )
+    }
+  }
+
+  /**
+   * @param {string} userId
+   */
+  async resetTokenUsage(userId) {
+    await UserFeatureUsage.findOneAndUpdate(
+      { _id: userId },
+      {
+        $set: {
+          [`features.${this.featureName}`]: {
+            usage: 0,
+            periodStart: new Date(),
+          },
+        },
+      },
+      { upsert: true }
+    ).exec()
   }
 
   /**
@@ -136,9 +166,11 @@ export default class TokenUsageRateLimiter {
   /**
    *
    * @param {string} userId
+   * @param {import('express').Request} req
    * @param {import('express').Response} res
+   * @param {{ auditLogTool?: string }} [options] - if `auditLogTool` is set, an `ai-quota-breach` audit log entry is written with `{ tool }` in the info payload when the request is blocked
    */
-  async checkUsage(userId, res) {
+  async checkUsage(userId, req, res, options = {}) {
     const allowance = await this._getAllowance(userId)
     const currentUsage = await this.getCurrentUsage(userId)
     const periodStart = currentUsage.periodStart ?? new Date()
@@ -149,8 +181,18 @@ export default class TokenUsageRateLimiter {
     }
     this.setRateLimitHeaders(res, currentUsage, allowance)
     if ((currentUsage.usage ?? 0) >= allowance) {
-      await AnalyticsManager.recordEventForUser(
-        userId,
+      if (options.auditLogTool) {
+        UserAuditLogHandler.addEntryInBackground(
+          userId,
+          'ai-quota-breach',
+          userId,
+          res.req?.ip,
+          { tool: options.auditLogTool }
+        )
+      }
+
+      AnalyticsManager.recordEventForSession(
+        req.session,
         'ai-token-usage-limit-exceeded'
       )
 

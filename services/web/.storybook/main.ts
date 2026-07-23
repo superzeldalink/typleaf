@@ -1,7 +1,7 @@
 // This file has been automatically migrated to valid ESM format by Storybook.
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
-import type { StorybookConfig } from '@storybook/react-webpack5'
+import { defineMain } from '@storybook/react-webpack5/node'
 import path, { dirname } from 'node:path'
 import MiniCssExtractPlugin from 'mini-css-extract-plugin'
 
@@ -23,7 +23,7 @@ function getAbsolutePath(value: string): any {
 const invalidateBabelCacheIfNeeded = require('../frontend/macros/invalidate-babel-cache-if-needed')
 invalidateBabelCacheIfNeeded()
 
-const config: StorybookConfig = {
+export default defineMain({
   core: {
     disableTelemetry: true,
   },
@@ -121,7 +121,9 @@ const config: StorybookConfig = {
           ...storybookConfig.resolve?.alias,
           // custom prefixes for import paths
           '@': path.join(rootDir, 'frontend/js/'),
+          '@modules': path.join(rootDir, 'modules/'),
           '@ol-types': path.join(rootDir, 'types/'),
+          '@ol-storybook': path.join(rootDir, '.storybook/'),
           '@wf': path.join(
             rootDir,
             'modules/writefull/frontend/js/integration/src/'
@@ -130,15 +132,28 @@ const config: StorybookConfig = {
       },
       module: {
         ...storybookConfig.module,
-        rules: (storybookConfig.module?.rules ?? []).concat({
-          test: /\.wasm$/,
-          type: 'asset/resource',
-          generator: {
-            filename: 'js/[name]-[contenthash][ext]',
+        rules: (storybookConfig.module?.rules ?? []).concat(
+          {
+            test: /\.wasm$/,
+            type: 'asset/resource',
+            generator: {
+              filename: 'js/[name]-[contenthash][ext]',
+            },
           },
-        }),
+          {
+            // Disable webpack's `new URL()` processing for pdfjs-dist worker
+            // files, so that webpack does not try to resolve qcms_bg.wasm and
+            // openjpeg.wasm (which live in pdfjs-dist/wasm/, not build/).
+            // The main webpack build relies on a `/* webpackIgnore: true */`
+            // comment (via yarn patch) to achieve the same effect, but
+            // storybook's babel pipeline may strip comments from the 1.9 MB
+            // worker file (babel `compact: "auto"` removes comments for files
+            // > 500 KB), so we disable URL parsing for these files instead.
+            test: /pdfjs-dist.*pdf\.worker.*\.m?js$/,
+            parser: { javascript: { url: false } },
+          }
+        ),
       },
     }
   },
-}
-export default config
+})

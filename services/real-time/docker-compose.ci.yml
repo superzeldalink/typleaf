@@ -4,12 +4,12 @@
 
 services:
   test_unit:
-    image: ci/$PROJECT_NAME:$BRANCH_NAME-$BUILD_NUMBER
+    image: ci/$PROJECT_NAME:$BRANCH_NAME_TAG_SAFE-$BUILD_NUMBER
     user: node
     volumes:
       - ./reports:/overleaf/services/real-time/reports
       - ../../tsconfig.backend.json:/overleaf/tsconfig.backend.json
-    command: npm run test:unit:_run
+    command: yarn run test:unit:_run
     environment:
       CI:
       MONGO_CONNECTION_STRING: mongodb://mongo/test-overleaf
@@ -26,8 +26,7 @@ services:
         condition: service_healthy
 
   test_acceptance:
-    build: .
-    image: ci/$PROJECT_NAME:$BRANCH_NAME-$BUILD_NUMBER
+    image: ci/$PROJECT_NAME:$BRANCH_NAME_TAG_SAFE-$BUILD_NUMBER
     environment:
       CI:
       RETRIES:
@@ -47,11 +46,11 @@ services:
       redis_test:
         condition: service_healthy
     user: node
-    command: npm run test:acceptance
+    command: yarn run test:acceptance
 
   tar:
     build: .
-    image: ci/$PROJECT_NAME:$BRANCH_NAME-$BUILD_NUMBER
+    image: ci/$PROJECT_NAME:$BRANCH_NAME_TAG_SAFE-$BUILD_NUMBER
     volumes:
       - ./:/tmp/build/
     command: tar -czf /tmp/build/build.tar.gz --exclude=build.tar.gz --exclude-vcs .

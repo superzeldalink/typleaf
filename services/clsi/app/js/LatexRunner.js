@@ -76,6 +76,7 @@ function runLatex(projectId, options, callback) {
     timeout,
     environment,
     compileGroup,
+    null,
     function (error, output) {
       delete ProcessTable[id]
       if (error) {

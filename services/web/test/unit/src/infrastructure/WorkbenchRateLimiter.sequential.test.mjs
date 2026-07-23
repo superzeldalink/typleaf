@@ -62,7 +62,7 @@ describe('WorkbenchRateLimiter', function () {
     ctx.SplitTestHandler = {
       promises: {
         getAssignmentForUser: sinon.stub(),
-        featureFlagEnabledForUser: sinon.stub().resolves(true),
+        featureFlagEnabledForMongoUser: sinon.stub().resolves(true),
       },
     }
     ctx.SplitTestHandler.promises.getAssignmentForUser
@@ -90,7 +90,7 @@ describe('WorkbenchRateLimiter', function () {
       '../../../../app/src/Features/Analytics/AnalyticsManager',
       () => ({
         default: {
-          recordEventForUser: sinon.stub(),
+          recordEventForSession: sinon.stub(),
         },
       })
     )
@@ -164,6 +164,7 @@ describe('WorkbenchRateLimiter', function () {
     describe('with no data', function () {
       beforeEach(async function (ctx) {
         await UserFeatureUsage.deleteMany({}).exec()
+        ctx.req = { session: {} }
         ctx.res = {
           set: sinon.stub(),
           headersSent: false,
@@ -172,12 +173,16 @@ describe('WorkbenchRateLimiter', function () {
 
       it('should not throw', async function (ctx) {
         await expect(
-          ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.res)
+          ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.req, ctx.res)
         ).to.eventually.be.fulfilled
       })
 
       it('sets rate limit headers', async function (ctx) {
-        await ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.res)
+        await ctx.WorkbenchRateLimiter.checkUsage(
+          ctx.alphaUserId,
+          ctx.req,
+          ctx.res
+        )
         expect(ctx.res.set).to.have.been.calledWith(
           'Token-RateLimit-Limit',
           '8000000'
@@ -197,6 +202,7 @@ describe('WorkbenchRateLimiter', function () {
     describe('with existing usage', function () {
       beforeEach(async function (ctx) {
         await UserFeatureUsage.deleteMany({}).exec()
+        ctx.req = { session: {} }
         ctx.res = {
           set: sinon.stub(),
           headersSent: false,
@@ -215,12 +221,16 @@ describe('WorkbenchRateLimiter', function () {
 
       it('should not throw if under limit', async function (ctx) {
         await expect(
-          ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.res)
+          ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.req, ctx.res)
         ).to.eventually.be.fulfilled
       })
 
       it('sets rate limit headers', async function (ctx) {
-        await ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.res)
+        await ctx.WorkbenchRateLimiter.checkUsage(
+          ctx.alphaUserId,
+          ctx.req,
+          ctx.res
+        )
         expect(ctx.res.set).to.have.been.calledWith(
           'Token-RateLimit-Limit',
           '8000000'
@@ -243,7 +253,7 @@ describe('WorkbenchRateLimiter', function () {
         await usageRecord.save()
 
         await expect(
-          ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.res)
+          ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.req, ctx.res)
         ).to.eventually.be.rejectedWith(/rate limit exceeded/i)
       })
     })
@@ -269,12 +279,16 @@ describe('WorkbenchRateLimiter', function () {
 
       it('should not throw', async function (ctx) {
         await expect(
-          ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.res)
+          ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.req, ctx.res)
         ).to.eventually.be.fulfilled
       })
 
       it('sets rate limit headers', async function (ctx) {
-        await ctx.WorkbenchRateLimiter.checkUsage(ctx.alphaUserId, ctx.res)
+        await ctx.WorkbenchRateLimiter.checkUsage(
+          ctx.alphaUserId,
+          ctx.req,
+          ctx.res
+        )
         expect(ctx.res.set).to.have.been.calledWith(
           'Token-RateLimit-Limit',
           '8000000'
@@ -289,6 +303,42 @@ describe('WorkbenchRateLimiter', function () {
           matchRateLimit(24 * 60 * 60)
         )
       })
+    })
+  })
+
+  describe('resetTokenUsage', function () {
+    beforeEach(async function () {
+      await UserFeatureUsage.deleteMany({}).exec()
+    })
+
+    it('resets usage to 0 and refreshes periodStart when existing usage is present', async function (ctx) {
+      const usageRecord = new UserFeatureUsage({
+        _id: ctx.alphaUserId,
+        features: {
+          aiWorkbench: {
+            usage: 5000000,
+            periodStart: new Date(new Date().getTime() - 1 * 60 * 60 * 1000),
+          },
+        },
+      })
+      await usageRecord.save()
+
+      const before = Date.now()
+      await ctx.WorkbenchRateLimiter.resetTokenUsage(ctx.alphaUserId)
+
+      const updated = await UserFeatureUsage.findById(ctx.alphaUserId).exec()
+      expect(updated.features.aiWorkbench.usage).to.equal(0)
+      expect(updated.features.aiWorkbench.periodStart.getTime()).to.be.at.least(
+        before
+      )
+    })
+
+    it('upserts a fresh usage record with zero usage when none exists', async function (ctx) {
+      await ctx.WorkbenchRateLimiter.resetTokenUsage(ctx.alphaUserId)
+
+      const created = await UserFeatureUsage.findById(ctx.alphaUserId).exec()
+      expect(created).to.exist
+      expect(created.features.aiWorkbench.usage).to.equal(0)
     })
   })
 

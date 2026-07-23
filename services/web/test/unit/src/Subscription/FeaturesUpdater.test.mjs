@@ -130,7 +130,7 @@ describe('FeaturesUpdater', function () {
       .resolves(ctx.user)
 
     ctx.AnalyticsManager = {
-      setUserPropertyForUserInBackground: sinon.stub(),
+      setUserPropertyForMongoUserInBackground: sinon.stub(),
     }
     ctx.Modules = {
       promises: { hooks: { fire: sinon.stub().resolves([]) } },
@@ -163,8 +163,12 @@ describe('FeaturesUpdater', function () {
 
     ctx.SplitTestHandler = {
       promises: {
-        featureFlagEnabledForUser: sinon.stub().resolves(false),
+        featureFlagEnabledForMongoUser: sinon.stub().resolves(false),
       },
+    }
+
+    ctx.GroupPolicy = {
+      find: sinon.stub().returns({ exec: sinon.stub().resolves([]) }),
     }
 
     vi.doMock(
@@ -230,6 +234,10 @@ describe('FeaturesUpdater', function () {
     }))
 
     vi.doMock('../../../../app/src/models/Subscription', () => ({}))
+
+    vi.doMock('../../../../app/src/models/GroupPolicy', () => ({
+      GroupPolicy: ctx.GroupPolicy,
+    }))
 
     vi.doMock('@overleaf/fetch-utils', () => ({
       fetchNothing: sinon.stub().resolves(),
@@ -435,8 +443,8 @@ describe('FeaturesUpdater', function () {
 
       it('should send the corresponding feature set user property', function (ctx) {
         expect(
-          ctx.AnalyticsManager.setUserPropertyForUserInBackground
-        ).to.have.been.calledWith(ctx.user._id, 'feature-set', 'all')
+          ctx.AnalyticsManager.setUserPropertyForMongoUserInBackground
+        ).to.have.been.calledWith(ctx.user, 'feature-set', 'all')
       })
 
       it('should sync subscription properties to customer.io', function (ctx) {
@@ -730,7 +738,7 @@ describe('FeaturesUpdater', function () {
             display_plan_type: 'Group Standard',
             plan_term_label: 'monthly',
             ai_plan: 'none',
-            group_ai_enabled: false,
+            group_ai_enabled: true,
             group_size: 8,
             next_renewal_date: '',
             expiry_date: '',
@@ -741,6 +749,49 @@ describe('FeaturesUpdater', function () {
             features: sinon.match.object,
             overleaf_id: ctx.user._id,
           })
+        )
+      })
+    })
+
+    describe('when the group subscription has a policy that blocks AI', function () {
+      beforeEach(async function (ctx) {
+        const policyId = new ObjectId()
+        ctx.SubscriptionViewModelBuilder.promises.getUsersSubscriptionDetails.resolves(
+          {
+            bestSubscription: {
+              type: 'group',
+              plan: {
+                planCode: 'group-plan-1',
+                groupPlan: true,
+                membersLimit: 5,
+              },
+              subscription: { teamName: 'Team Alpha' },
+            },
+            memberGroupSubscriptions: [
+              {
+                planCode: 'group-plan-1',
+                teamName: 'Team Alpha',
+                membersLimit: 8,
+                groupPolicy: policyId,
+              },
+            ],
+            managedGroupSubscriptions: [],
+            individualSubscription: null,
+          }
+        )
+        ctx.GroupPolicy.find.returns({
+          exec: sinon
+            .stub()
+            .resolves([{ _id: policyId, userCannotUseAIFeatures: true }]),
+        })
+        await ctx.FeaturesUpdater.promises.refreshFeatures(ctx.user._id, 'test')
+      })
+
+      it('should set group_ai_enabled to false', function (ctx) {
+        expect(ctx.Modules.promises.hooks.fire).to.have.been.calledWith(
+          'setUserProperties',
+          ctx.user._id,
+          sinon.match({ group_ai_enabled: false })
         )
       })
     })
@@ -788,6 +839,76 @@ describe('FeaturesUpdater', function () {
       })
     })
 
+    describe('group_role property', function () {
+      it("should set group_role to '' when the user is not in any group", async function (ctx) {
+        ctx.SubscriptionViewModelBuilder.promises.getUsersSubscriptionDetails.resolves(
+          {
+            bestSubscription: { type: 'free' },
+            individualSubscription: null,
+            memberGroupSubscriptions: [],
+            managedGroupSubscriptions: [],
+          }
+        )
+        await ctx.FeaturesUpdater.promises.refreshFeatures(ctx.user._id, 'test')
+        expect(ctx.Modules.promises.hooks.fire).to.have.been.calledWith(
+          'setUserProperties',
+          ctx.user._id,
+          sinon.match({ group_role: '' })
+        )
+      })
+
+      it("should set group_role to 'member' when the user only belongs to a group as a member", async function (ctx) {
+        ctx.SubscriptionViewModelBuilder.promises.getUsersSubscriptionDetails.resolves(
+          {
+            bestSubscription: { type: 'free' },
+            individualSubscription: null,
+            memberGroupSubscriptions: [{ _id: new ObjectId() }],
+            managedGroupSubscriptions: [],
+          }
+        )
+        await ctx.FeaturesUpdater.promises.refreshFeatures(ctx.user._id, 'test')
+        expect(ctx.Modules.promises.hooks.fire).to.have.been.calledWith(
+          'setUserProperties',
+          ctx.user._id,
+          sinon.match({ group_role: 'member' })
+        )
+      })
+
+      it("should set group_role to 'manager' when the user manages a group they don't own", async function (ctx) {
+        ctx.SubscriptionViewModelBuilder.promises.getUsersSubscriptionDetails.resolves(
+          {
+            bestSubscription: { type: 'free' },
+            individualSubscription: null,
+            memberGroupSubscriptions: [],
+            managedGroupSubscriptions: [{ admin_id: { _id: new ObjectId() } }],
+          }
+        )
+        await ctx.FeaturesUpdater.promises.refreshFeatures(ctx.user._id, 'test')
+        expect(ctx.Modules.promises.hooks.fire).to.have.been.calledWith(
+          'setUserProperties',
+          ctx.user._id,
+          sinon.match({ group_role: 'manager' })
+        )
+      })
+
+      it("should set group_role to 'admin' when the user owns a group", async function (ctx) {
+        ctx.SubscriptionViewModelBuilder.promises.getUsersSubscriptionDetails.resolves(
+          {
+            bestSubscription: { type: 'free' },
+            individualSubscription: null,
+            memberGroupSubscriptions: [],
+            managedGroupSubscriptions: [{ admin_id: { _id: ctx.user._id } }],
+          }
+        )
+        await ctx.FeaturesUpdater.promises.refreshFeatures(ctx.user._id, 'test')
+        expect(ctx.Modules.promises.hooks.fire).to.have.been.calledWith(
+          'setUserProperties',
+          ctx.user._id,
+          sinon.match({ group_role: 'admin' })
+        )
+      })
+    })
+
     describe('with a non-standard feature set', async function () {
       beforeEach(async function (ctx) {
         ctx.SubscriptionLocator.promises.getGroupSubscriptionsMemberOf
@@ -798,8 +919,8 @@ describe('FeaturesUpdater', function () {
 
       it('should send mixed feature set user property', function (ctx) {
         sinon.assert.calledWith(
-          ctx.AnalyticsManager.setUserPropertyForUserInBackground,
-          ctx.user._id,
+          ctx.AnalyticsManager.setUserPropertyForMongoUserInBackground,
+          ctx.user,
           'feature-set',
           'mixed'
         )

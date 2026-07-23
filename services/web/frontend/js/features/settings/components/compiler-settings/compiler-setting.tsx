@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useProjectSettingsContext } from '@/features/editor-left-menu/context/project-settings-context'
 import DropdownSetting from '../dropdown-setting'
 import type { Option } from '../dropdown-setting'
@@ -5,7 +6,6 @@ import { useTranslation } from 'react-i18next'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { ProjectCompiler } from '@ol-types/project-settings'
 import { useSetCompilationSettingWithEvent } from '@/features/editor-left-menu/hooks/use-set-compilation-setting'
-
 const OPTIONS: Option<ProjectCompiler>[] = [
   {
     value: 'typst',
@@ -15,6 +15,7 @@ const OPTIONS: Option<ProjectCompiler>[] = [
 
 export default function CompilerSetting() {
   const { compiler, setCompiler } = useProjectSettingsContext()
+  const [compilerOptions] = useState(() => getCompilerOptions())
   const { t } = useTranslation()
   const { write } = usePermissionsContext()
   const changeCompiler = useSetCompilationSettingWithEvent(
@@ -28,7 +29,7 @@ export default function CompilerSetting() {
       label={t('compiler')}
       description={t('the_latex_engine_used_for_compiling')}
       disabled={!write}
-      options={OPTIONS}
+      options={compilerOptions}
       onChange={changeCompiler}
       value={compiler}
       translateOptions="no"

@@ -197,6 +197,10 @@ const rateLimiters = {
     points: 5,
     duration: 60,
   }),
+  documentExportDownload: new RateLimiter('document-export-download', {
+    points: 30,
+    duration: 60,
+  }),
 }
 
 async function initialize(webRouter, privateApiRouter, publicApiRouter) {
@@ -612,7 +616,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   )
 
   webRouter.get(
-    '/download/project/:Project_id/build/:buildId/output/cached/:filename',
+    '/download/project/:Project_id/build/:editorBuildId/output/cached/:filename(.*)',
     AuthorizationMiddleware.ensureUserCanReadProject,
     ClsiCacheController.downloadFromCache
   )
@@ -646,16 +650,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   // direct url access to output files for a specific build
   webRouter.get(
-    /^\/project\/([^/]*)\/build\/([0-9a-f-]+)\/output\/(.*)$/,
-    function (req, res, next) {
-      const params = {
-        Project_id: req.params[0],
-        build_id: req.params[1],
-        file: req.params[2],
-      }
-      req.params = params
-      next()
-    },
+    '/project/:Project_id/build/:build_id/output/:file(.*)',
     rateLimiterMiddlewareOutputFiles,
     AuthorizationMiddleware.ensureUserCanReadProject,
     CompileController.getFileFromClsi
@@ -663,17 +658,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   // direct url access to output files for a specific user and build
   webRouter.get(
-    /^\/project\/([^/]*)\/user\/([0-9a-f]+)\/build\/([0-9a-f-]+)\/output\/(.*)$/,
-    function (req, res, next) {
-      const params = {
-        Project_id: req.params[0],
-        user_id: req.params[1],
-        build_id: req.params[2],
-        file: req.params[3],
-      }
-      req.params = params
-      next()
-    },
+    '/project/:Project_id/user/:user_id/build/:build_id/output/:file(.*)',
     rateLimiterMiddlewareOutputFiles,
     AuthorizationMiddleware.ensureUserCanReadProject,
     CompileController.getFileFromClsi
@@ -777,6 +762,15 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       }),
       AuthorizationMiddleware.ensureUserCanReadProject,
       ProjectDownloadsController.exportProjectConversion
+    )
+    webRouter.get(
+      '/project/:Project_id/download/conversion/:conversionId/:type/build/:buildId/output/:file(.*)',
+      AuthenticationController.requireLogin(),
+      RateLimiterMiddleware.rateLimit(rateLimiters.documentExportDownload, {
+        params: ['Project_id'],
+      }),
+      AuthorizationMiddleware.ensureUserCanReadProject,
+      ProjectDownloadsController.downloadPreparedProjectExport
     )
   }
 
@@ -959,6 +953,11 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/project/:Project_id/doc/:doc_id',
     AuthenticationController.requirePrivateApiAuth(),
     DocumentController.setDocument
+  )
+  privateApiRouter.post(
+    '/project/:Project_id/doc/:doc_id/changes/reject',
+    AuthenticationController.requirePrivateApiAuth(),
+    DocumentController.trackChangesRejected
   )
 
   privateApiRouter.post(

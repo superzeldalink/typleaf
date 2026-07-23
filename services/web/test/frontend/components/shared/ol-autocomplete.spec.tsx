@@ -59,6 +59,8 @@ function render(props: RenderProps) {
           createOptionPrefix={props.createOptionPrefix}
           useFuzzySearch={props.useFuzzySearch}
           expandUp={props.expandUp}
+          onClose={props.onClose}
+          isOpen={props.isOpen}
         />
         <button type="submit">submit</button>
       </form>
@@ -254,6 +256,26 @@ describe('<OLAutocomplete />', function () {
       cy.findByRole('combobox').type('Apple', { force: true })
 
       cy.findByLabelText('Delete').should('not.exist')
+    })
+
+    it('calls onClose when an item is selected', function () {
+      const closeHandler = cy.stub().as('closeHandler')
+      render({ items: testItems, onClose: closeHandler })
+
+      cy.findByRole('combobox').click()
+      cy.findByText('Banana').click()
+
+      cy.get('@closeHandler').should('have.been.calledOnce')
+    })
+
+    it('calls onClose when Escape is pressed', function () {
+      const closeHandler = cy.stub().as('closeHandler')
+      render({ items: testItems, onClose: closeHandler })
+
+      cy.findByRole('combobox').click()
+      cy.findByRole('combobox').type('{esc}')
+
+      cy.get('@closeHandler').should('have.been.calledOnce')
     })
   })
 
@@ -527,6 +549,35 @@ describe('<OLAutocomplete />', function () {
       cy.findByRole('combobox').type('  apple  ')
 
       cy.contains('+ Create').should('exist')
+    })
+  })
+
+  describe('controlled isOpen prop', function () {
+    it('keeps dropdown open when input is blurred', function () {
+      render({ items: testItems, isOpen: true })
+      cy.findByRole('combobox').click()
+      cy.get('.dropdown-menu.show').should('exist')
+
+      cy.findByRole('combobox').blur()
+      cy.get('.dropdown-menu.show').should('exist')
+    })
+
+    it('keeps dropdown open when input is clicked while already open', function () {
+      render({ items: testItems, isOpen: true })
+      cy.findByRole('combobox').click()
+      cy.get('.dropdown-menu.show').should('exist')
+
+      cy.findByRole('combobox').click()
+      cy.get('.dropdown-menu.show').should('exist')
+    })
+
+    it('calls onClose when Escape is pressed', function () {
+      const closeHandler = cy.stub().as('closeHandler')
+      render({ items: testItems, isOpen: true, onClose: closeHandler })
+
+      cy.findByRole('combobox').type('{esc}')
+
+      cy.get('@closeHandler').should('have.been.calledOnce')
     })
   })
 

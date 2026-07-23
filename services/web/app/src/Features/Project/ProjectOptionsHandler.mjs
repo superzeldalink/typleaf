@@ -16,7 +16,7 @@ const ProjectOptionsHandler = {
    */
   normalizeCompiler(compiler) {
     compiler = compiler.toLowerCase()
-    if (!safeCompilers.includes(compiler)) {
+    if (!settings.safeCompilers.includes(compiler)) {
       throw new OError('invalid compiler', { compiler })
     }
     return compiler

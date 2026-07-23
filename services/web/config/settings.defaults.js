@@ -58,7 +58,9 @@ const defaultTextExtensions = [
   'clo',
   'ldf',
   'rmd',
+  'qmd',
   'lua',
+  'py',
   'gv',
   'mf',
   'yml',
@@ -117,6 +119,8 @@ const httpPermissionsPolicy = {
     'on-device-speech-recognition': 'self',
   },
 }
+
+const safeCompilers = ['xelatex', 'pdflatex', 'latex', 'lualatex']
 
 module.exports = {
   env: 'server-ce',
@@ -233,6 +237,9 @@ module.exports = {
         '127.0.0.1'
       }:3003`,
     },
+    geoIpLookup: {
+      cacheSize: intFromEnv('GEO_IP_LOOKUP_CACHE_SIZE', 10_000),
+    },
     docstore: {
       url: `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016`,
       pubUrl: `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016`,
@@ -245,12 +252,16 @@ module.exports = {
     },
     clsi: {
       url: `http://${process.env.CLSI_HOST || '127.0.0.1'}:3013`,
-      downloadHost: process.env.CLSI_LB_IP
-        ? `http://${process.env.CLSI_LB_IP}:80`
+      downloadHost: process.env.CLSI_LB_IP || process.env.CLSI_LB_HOST
+        ? `http://${process.env.CLSI_LB_IP || process.env.CLSI_LB_HOST}:80`
         : normalizedDownloadHost,
       backendGroupName: undefined,
-      submissionBackendClass:
-        process.env.CLSI_SUBMISSION_BACKEND_CLASS || 'c3d',
+      submissionCompileBackendClass:
+        process.env.CLSI_SUBMISSION_COMPILE_BACKEND_CLASS || 'free',
+      standardCompileBackendClass:
+        process.env.CLSI_STANDARD_COMPILE_BACKEND_CLASS || 'free',
+      priorityCompileBackendClass:
+        process.env.CLSI_PRIORITY_COMPILE_BACKEND_CLASS || 'premium',
     },
     clsiCache: {
       instances: JSON.parse(process.env.CLSI_CACHE_INSTANCES || '[]'),
@@ -267,9 +278,6 @@ module.exports = {
     },
     realTime: {
       url: `http://${process.env.REALTIME_HOST || '127.0.0.1'}:3026`,
-    },
-    contacts: {
-      url: `http://${process.env.CONTACTS_HOST || '127.0.0.1'}:3036`,
     },
     notifications: {
       url: `http://${process.env.NOTIFICATIONS_HOST || '127.0.0.1'}:3042`,
@@ -334,6 +342,7 @@ module.exports = {
 
   isCodeSpace: process.env.IS_CODE_SPACE === 'true',
   isDevEnv: process.env.NODE_ENV === 'development',
+  isCI: process.env.NODE_ENV === 'test',
 
   lockManager: {
     lockTestInterval: intFromEnv('LOCK_MANAGER_LOCK_TEST_INTERVAL', 50),
@@ -428,6 +437,15 @@ module.exports = {
 
   // featuresEpoch: 'YYYY-MM-DD',
 
+  personalAccessTokens: {
+    expiry: {
+      warningWindowDays: intFromEnv(
+        'PERSONAL_ACCESS_TOKEN_WARNING_WINDOW_DAYS',
+        2
+      ),
+    },
+  },
+
   features: {
     personal: defaultFeatures,
   },
@@ -465,6 +483,12 @@ module.exports = {
 
   disableChat: process.env.OVERLEAF_DISABLE_CHAT === 'true',
   disableLinkSharing: process.env.OVERLEAF_DISABLE_LINK_SHARING === 'true',
+  safeCompilers,
+  defaultLatexCompiler: safeCompilers.includes(
+    process.env.DEFAULT_LATEX_COMPILER
+  )
+    ? process.env.DEFAULT_LATEX_COMPILER
+    : 'pdflatex',
   enableSubscriptions: false,
   restrictedCountries: [],
   enableOnboardingEmails: process.env.ENABLE_ONBOARDING_EMAILS === 'true',
@@ -1014,6 +1038,7 @@ module.exports = {
     tprFileViewNotOriginalImporter: [],
     contactUsModal: [],
     sourceEditorExtensions: [],
+    sourceEditorVisualExtensions: [],
     sourceEditorComponents: [],
     pdfLogEntryHeaderActionComponents: [],
     pdfLogEntryComponents: [],
@@ -1022,11 +1047,14 @@ module.exports = {
     diagnosticActions: [],
     sourceEditorCompletionSources: [],
     sourceEditorSymbolPalette: [],
+    sourceEditorToolbarStartButtons: [],
+    sourceEditorToolbarButtonGroups: [],
     sourceEditorToolbarComponents: [],
     sourceEditorToolbarEndButtons: [],
     rootContextProviders: [],
     mainEditorLayoutModals: [],
     mainEditorLayoutPanels: [],
+    pythonRunner: [],
     langFeedbackLinkingWidgets: [],
     labsExperiments: [],
     integrationLinkingWidgets: [],
@@ -1036,6 +1064,7 @@ module.exports = {
     editorLeftMenuSync: [],
     editorLeftMenuManageTemplate: [],
     menubarExtraComponents: [],
+    insertMenuSections: [],
     oauth2Server: [],
     managedGroupSubscriptionEnrollmentNotification: [],
     managedGroupEnrollmentInvite: [],
@@ -1075,10 +1104,14 @@ module.exports = {
     ],
     integrationPanelComponents: [],
     referenceSearchSetting: [],
-    errorLogsComponents: [],
+    settingsModalEditorTabSections: [],
+    settingsModalSpellcheckSections: [],
+    editorFloatingMenuActions: [],
     referenceIndices: [],
     railEntries: [],
     railPopovers: [],
+    railActions: [],
+    railModals: [],
   },
 
   moduleImportSequence: [
@@ -1102,7 +1135,7 @@ module.exports = {
 
   unsupportedBrowsers: {
     ie: '<=11',
-    safari: '<=14',
+    safari: '<15',
     firefox: '<=78',
   },
 

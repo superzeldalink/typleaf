@@ -62,7 +62,7 @@ export const languages = [
   }),
   LanguageDescription.of({
     name: 'markdown',
-    extensions: ['md', 'markdown'],
+    extensions: ['md', 'markdown', 'qmd', 'rmd'],
     load: () => {
       return import('./markdown').then(m => m.markdown())
     },

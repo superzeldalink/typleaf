@@ -374,6 +374,7 @@ export function getResyncPending(req, res, next) {
     if (err) return next(err)
     res.json({
       resyncPending: state.isSyncOngoing(),
+      syncStuck: state.isSyncStuck(),
     })
   })
 }
@@ -644,9 +645,11 @@ const resyncProjectSchema = z.object({
   }),
   query: z.object({
     force: z.stringbool().default(false),
+    recoverCorruptedFiles: z.stringbool().default(false),
   }),
   body: z.object({
     force: z.boolean().default(false),
+    recoverCorruptedFiles: z.boolean().default(false),
     origin: z
       .object({
         kind: z.string(),
@@ -667,6 +670,9 @@ export function resyncProject(req, res, next) {
     options.historyRangesMigration = body.historyRangesMigration
   }
   if (query.force || body.force) {
+    if (query.recoverCorruptedFiles || body.recoverCorruptedFiles) {
+      options.recoverCorruptedFiles = true
+    }
     // this will delete the queue and clear the sync state
     // use if the project is completely broken
     SyncManager.startHardResync(projectId, options, error => {
