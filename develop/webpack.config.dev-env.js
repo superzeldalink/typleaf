@@ -4,7 +4,7 @@ const base = require('./webpack.config.dev')
 
 module.exports = merge(base, {
   devServer: {
-    allowedHosts: 'auto',
+    allowedHosts: ['typleaf.linkclouds.top', '192.168.0.3', 'localhost'],
     devMiddleware: {
       index: false,
     },
