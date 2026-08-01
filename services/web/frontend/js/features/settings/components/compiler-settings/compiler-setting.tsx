@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useProjectSettingsContext } from '@/features/editor-left-menu/context/project-settings-context'
 import DropdownSetting from '../dropdown-setting'
 import type { Option } from '../dropdown-setting'
@@ -15,7 +14,6 @@ const OPTIONS: Option<ProjectCompiler>[] = [
 
 export default function CompilerSetting() {
   const { compiler, setCompiler } = useProjectSettingsContext()
-  const [compilerOptions] = useState(() => getCompilerOptions())
   const { t } = useTranslation()
   const { write } = usePermissionsContext()
   const changeCompiler = useSetCompilationSettingWithEvent(
@@ -29,7 +27,7 @@ export default function CompilerSetting() {
       label={t('compiler')}
       description={t('the_latex_engine_used_for_compiling')}
       disabled={!write}
-      options={compilerOptions}
+      options={OPTIONS}
       onChange={changeCompiler}
       value={compiler}
       translateOptions="no"
