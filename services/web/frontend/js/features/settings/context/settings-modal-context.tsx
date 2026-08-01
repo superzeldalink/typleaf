@@ -22,7 +22,6 @@ import NonBlinkingCursorSetting from '@/features/settings/components/editor-sett
 import MathPreviewSetting from '@/features/settings/components/editor-settings/math-preview-setting'
 import RootDocumentSetting from '@/features/settings/components/compiler-settings/root-document-setting'
 import CompilerSetting from '@/features/settings/components/compiler-settings/compiler-setting'
-import ImageNameSetting from '@/features/settings/components/compiler-settings/image-name-setting'
 import DraftSetting from '@/features/settings/components/compiler-settings/draft-setting'
 import StopOnFirstErrorSetting from '@/features/settings/components/compiler-settings/stop-on-first-error-setting'
 import AutoCompileSetting from '@/features/settings/components/compiler-settings/auto-compile-setting'
@@ -216,10 +215,9 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
                 key: 'compiler',
                 component: <CompilerSetting />,
               },
-              {
-                key: 'imageName',
-                component: <ImageNameSetting />,
-              },
+              // TeX Live version is intentionally omitted: this fork compiles
+              // with Typst and ships no TeX Live, so the picker would offer
+              // images that are never installed or used.
               {
                 key: 'draft',
                 component: <DraftSetting />,
