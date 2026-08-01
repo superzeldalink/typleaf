@@ -246,6 +246,46 @@ function PdfJsViewer({ url, pdfFile }: PdfJsViewerProps) {
     }
   }, [setPosition, pdfJsWrapper, initialised])
 
+  // listen for double-click events
+  useEffect(() => {
+    if (pdfJsWrapper) {
+      const handleTextlayerrendered = (textLayer: any) => {
+        // handle both versions for backwards-compatibility
+        const textLayerDiv =
+          textLayer.source.textLayerDiv ?? textLayer.source.textLayer.div
+
+        if (!textLayerDiv.dataset.listeningForDoubleClick) {
+          textLayerDiv.dataset.listeningForDoubleClick = true
+
+          const doubleClickListener = (event: MouseEvent) => {
+            const clickPosition = pdfJsWrapper.clickPosition(
+              event,
+              textLayerDiv.closest('.page').querySelector('canvas'),
+              textLayer.pageNumber - 1
+            )
+
+            if (clickPosition) {
+              window.dispatchEvent(
+                new CustomEvent('synctex:sync-to-position', {
+                  detail: {
+                    position: clickPosition,
+                    selectText: window.getSelection()?.toString(),
+                  },
+                })
+              )
+            }
+          }
+
+          textLayerDiv.addEventListener('dblclick', doubleClickListener)
+        }
+      }
+
+      pdfJsWrapper.eventBus.on('textlayerrendered', handleTextlayerrendered)
+      return () =>
+        pdfJsWrapper.eventBus.off('textlayerrendered', handleTextlayerrendered)
+    }
+  }, [pdfJsWrapper])
+
   const positionRef = useRef(position)
   useEffect(() => {
     positionRef.current = position

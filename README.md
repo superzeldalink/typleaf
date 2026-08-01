@@ -57,10 +57,10 @@ This repository contains fork-specific Typst work that is separate from upstream
 - Typst projects can compile in the development stack without pulling in TeX Live for the Typst image path.
 - Typst compile output URLs work in local development.
 - The file outline works for Typst headings in the code editor.
-- PDF sync navigation is implemented for Typst at the block level:
-  - headings
-  - text paragraphs
-  - `#figure(...)` blocks, including tables wrapped in figures
+- PDF sync navigation works in both directions at the block level:
+  - code to PDF, and double-clicking PDF text to jump back to the source
+  - headings and text paragraphs are anchored; `#figure(...)` blocks are not
+    yet matched, so they fall back to the nearest enclosing block
 - The `Visual Editor` toggle is hidden for `.typ` files for now, so Typst stays in code-editor mode.
 
 ### Planned / Not Yet Implemented
@@ -73,10 +73,12 @@ This repository contains fork-specific Typst work that is separate from upstream
 
 ### Known Limitations / Current Bugs
 
-- PDF-to-code inverse sync for Typst is currently disabled in the PDF preview UI.
-- The disablement is intentional for now because double-clicking PDF text could resolve to the wrong source location in some documents.
-- Code-to-PDF sync remains available, but Typst sync behavior should still be treated as work in progress.
-- If you are testing Typst in this fork, expect rough edges around sync precision, anchor selection, and editor/PDF parity.
+- Sync is block-level: a jump lands on the enclosing heading or paragraph, not
+  the exact word that was double-clicked.
+- `#figure(...)` blocks are not matched between source and rendered output, so
+  they carry no anchor of their own and resolve to the block above them.
+- Source blocks with no rendered counterpart are deliberately left unanchored.
+  Clicking them jumps to the nearest preceding block rather than guessing.
 
 ## Keeping up to date
 

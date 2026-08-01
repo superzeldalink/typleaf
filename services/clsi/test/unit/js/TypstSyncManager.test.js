@@ -66,4 +66,63 @@ describe('TypstSyncManager', () => {
       expect(ctx.TypstSyncManager.findPdfAnchor([], 1, 100)).to.equal(null)
     })
   })
+
+  describe('pairBlocks', () => {
+    const src = (line, text) => ({
+      file: 'main.typ',
+      line,
+      endLine: line,
+      kind: 'paragraph',
+      text,
+    })
+    const rendered = (y, text) => ({ page: 1, x: 72, y, text })
+
+    it('pairs blocks by content, not by position', async ctx => {
+      // The renderer emits an extra block ("intro") that the source scan never
+      // produced. Index pairing would shift every later block onto the wrong
+      // coordinates; content alignment must keep alpha/beta/gamma correct.
+      const entries = ctx.TypstSyncManager.pairBlocks(
+        [src(10, 'alpha'), src(20, 'beta'), src(30, 'gamma')],
+        {
+          paragraphs: [
+            rendered(50, 'intro'),
+            rendered(100, 'alpha'),
+            rendered(200, 'beta'),
+            rendered(300, 'gamma'),
+          ],
+        }
+      )
+      expect(entries.map(e => [e.line, e.y])).to.deep.equal([
+        [10, 100],
+        [20, 200],
+        [30, 300],
+      ])
+    })
+
+    it('drops source blocks that were never rendered', async ctx => {
+      // "beta" has no rendered counterpart. It must get no anchor at all
+      // rather than borrowing gamma's position.
+      const entries = ctx.TypstSyncManager.pairBlocks(
+        [src(10, 'alpha'), src(20, 'beta'), src(30, 'gamma')],
+        { paragraphs: [rendered(100, 'alpha'), rendered(300, 'gamma')] }
+      )
+      expect(entries.map(e => [e.line, e.y])).to.deep.equal([
+        [10, 100],
+        [30, 300],
+      ])
+    })
+
+    it('preserves document order when matching', async ctx => {
+      // Repeated text must not let a later source block match an earlier
+      // rendered block.
+      const entries = ctx.TypstSyncManager.pairBlocks(
+        [src(10, 'same'), src(20, 'same')],
+        { paragraphs: [rendered(100, 'same'), rendered(200, 'same')] }
+      )
+      expect(entries.map(e => [e.line, e.y])).to.deep.equal([
+        [10, 100],
+        [20, 200],
+      ])
+    })
+  })
 })

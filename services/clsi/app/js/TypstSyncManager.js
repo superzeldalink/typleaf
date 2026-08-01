@@ -339,6 +339,60 @@ function createEntry(source, query) {
   return entry.page && entry.x != null && entry.y != null ? entry : null;
 }
 
+function syncKey(text) {
+  return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// The source scan and the rendered query disagree on how many blocks exist
+// (a document may render figures the scanner never saw, or contain source
+// paragraphs that produce no standalone rendered block), so equality has to
+// tolerate small differences in how inline markup survives rendering.
+function blocksMatch(source, query) {
+  const a = syncKey(source?.text);
+  const b = syncKey(normalizeTypstInline(query?.text));
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const prefix = Math.min(24, a.length, b.length);
+  return prefix > 0 && a.slice(0, prefix) === b.slice(0, prefix);
+}
+
+// Longest common subsequence over block text. Pairing by array index (the
+// previous approach) assumes the two lists line up one-to-one; when they do
+// not, every block after the first divergence inherits another block's
+// coordinates. Aligning on content instead keeps the pairs in document order
+// and simply drops blocks that have no counterpart, so a missing anchor
+// degrades to "no jump" rather than "jump somewhere wrong".
+function alignBlocks(sourceList, queryList) {
+  const n = sourceList.length;
+  const m = queryList.length;
+  const width = m + 1;
+  const dp = new Int32Array((n + 1) * width);
+
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i * width + j] = blocksMatch(sourceList[i], queryList[j])
+        ? dp[(i + 1) * width + (j + 1)] + 1
+        : Math.max(dp[(i + 1) * width + j], dp[i * width + (j + 1)]);
+    }
+  }
+
+  const pairs = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (blocksMatch(sourceList[i], queryList[j])) {
+      pairs.push([sourceList[i], queryList[j]]);
+      i++;
+      j++;
+    } else if (dp[(i + 1) * width + j] >= dp[i * width + (j + 1)]) {
+      i++;
+    } else {
+      j++;
+    }
+  }
+  return pairs;
+}
+
 function pairBlocks(sourceBlocks, queriedBlocks) {
   const sourceByKind = {
     heading: sourceBlocks.filter((block) => block.kind === "heading"),
@@ -360,51 +414,24 @@ function pairBlocks(sourceBlocks, queriedBlocks) {
   for (const kind of ["heading", "paragraph", "figure"]) {
     const sourceList = sourceByKind[kind];
     const queryList = queryByKind[kind];
-    const count = Math.min(sourceList.length, queryList.length);
+    const pairs = alignBlocks(sourceList, queryList);
 
-    if (sourceList.length !== queryList.length) {
-      logger.warn(
-        {
-          kind,
-          sourceBlocks: sourceList.length,
-          queriedBlocks: queryList.length,
-        },
-        "typst sync block count mismatch",
-      );
-    }
-
-    for (let index = 0; index < count; index++) {
-      const entry = createEntry(sourceList[index], queryList[index]);
+    for (const [source, query] of pairs) {
+      const entry = createEntry(source, query);
       if (entry) {
         entries.push(entry);
       }
     }
 
-    const mismatches = [];
-    for (let index = 0; index < count; index++) {
-      const sourceText = sourceList[index].text;
-      const queryText = normalizeTypstInline(queryList[index].text);
-      if (
-        sourceText &&
-        queryText &&
-        !sourceText.includes(
-          queryText.slice(0, Math.min(queryText.length, 24)),
-        ) &&
-        !queryText.includes(
-          sourceText.slice(0, Math.min(sourceText.length, 24)),
-        )
-      ) {
-        mismatches.push({
-          source: sourceText,
-          query: queryText,
-        });
-      }
-    }
-
-    if (mismatches.length > 0) {
+    if (pairs.length < sourceList.length) {
       logger.debug(
-        { kind, mismatches: mismatches.slice(0, 5) },
-        "typst sync block text mismatch; using source order",
+        {
+          kind,
+          sourceBlocks: sourceList.length,
+          queriedBlocks: queryList.length,
+          paired: pairs.length,
+        },
+        "typst sync blocks without a rendered counterpart; they get no anchor",
       );
     }
   }
@@ -545,6 +572,7 @@ async function copySyncMapToBuild(compileDir, outputDir, buildId) {
 export default {
   TYPST_SYNC_MAP,
   collectSourceBlocks,
+  pairBlocks,
   findCodeAnchor,
   findPdfAnchor,
   buildPdfHighlight,
