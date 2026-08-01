@@ -306,6 +306,11 @@ async function queryTypstBlocks(
       timeout,
       {},
       "typst-sync",
+      // CommandRunner.run takes (…, compileGroup, cwd, callback). Without an
+      // explicit cwd, promisify passes its callback into the cwd slot and
+      // run() calls _.once(undefined), which throws "Expected a function" and
+      // silently aborts sync map generation.
+      undefined,
     );
     const result = JSON.parse(stdout);
     return result?.[0]?.value || {};
@@ -483,20 +488,39 @@ function buildPdfHighlight(entry) {
   };
 }
 
-function findPdfAnchor(entries, page, y) {
-  const samePageEntries = entries.filter((entry) => entry.page === page);
-  const candidates = samePageEntries.length > 0 ? samePageEntries : entries;
-  if (candidates.length === 0) return null;
+const byPosition = (a, b) => a.page - b.page || a.y - b.y;
 
-  return candidates.reduce((best, entry) => {
-    const pageDistance = Math.abs(entry.page - page);
-    const yDistance = Math.abs(entry.y - y);
-    const distance = pageDistance * 10000 + yDistance;
-    if (!best || distance < best.distance) {
-      return { entry, distance };
-    }
-    return best;
-  }, null)?.entry;
+// Anchors mark the START of a source block and y grows downward
+// (buildPdfHighlight emits origin: "top-left"). The block a click belongs to is
+// therefore the last anchor at or above the click -- NOT the nearest anchor by
+// absolute distance, which snaps to the following block whenever the click
+// falls in the lower half of a long paragraph.
+function findPdfAnchor(entries, page, y) {
+  if (!entries || entries.length === 0) return null;
+
+  const samePage = entries
+    .filter((entry) => entry.page === page)
+    .sort(byPosition);
+
+  if (samePage.length > 0) {
+    // Block i spans [y_i, y_{i+1}), so the containing block is the last anchor
+    // at or above the click. No tolerance is applied: nudging the boundaries
+    // would hand the tail of every block to the block after it.
+    const atOrAbove = samePage.filter((entry) => entry.y <= y);
+    // Clicking above the first anchor on a page (e.g. in a running header)
+    // belongs to that page's first block.
+    return atOrAbove.length > 0 ? atOrAbove[atOrAbove.length - 1] : samePage[0];
+  }
+
+  // No anchors on this page: prefer the last anchor on the closest preceding
+  // page. Falling back to the globally nearest could jump forward past the
+  // click, which is what makes an unmapped page feel broken rather than coarse.
+  const preceding = entries.filter((entry) => entry.page < page);
+  if (preceding.length > 0) {
+    return preceding.sort(byPosition)[preceding.length - 1];
+  }
+
+  return entries.slice().sort(byPosition)[0];
 }
 
 async function copySyncMapToBuild(compileDir, outputDir, buildId) {
