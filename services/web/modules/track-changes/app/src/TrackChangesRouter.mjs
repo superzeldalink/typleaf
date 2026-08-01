@@ -54,6 +54,12 @@ export default {
       AuthorizationMiddleware.ensureUserCanReadProject,
       TrackChangesController.deleteMessage
     )
+    webRouter.delete(
+      '/project/:project_id/thread/:thread_id/own-messages/:message_id',
+      AuthorizationMiddleware.blockRestrictedUserFromProject,
+      AuthorizationMiddleware.ensureUserCanReadProject,
+      TrackChangesController.deleteOwnMessage
+    )
     webRouter.post(
       '/project/:project_id/doc/:doc_id/thread/:thread_id/resolve',
       AuthorizationMiddleware.blockRestrictedUserFromProject,

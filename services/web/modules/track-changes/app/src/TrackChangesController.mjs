@@ -113,6 +113,20 @@ const TrackChangesController = {
       next(err)
     }
   },
+  async deleteOwnMessage(req, res, next) {
+    // Reviewers may only delete their own messages, so scope the delete to the
+    // logged-in user rather than trusting the message id alone.
+    try {
+      const { project_id, thread_id, message_id } = req.params
+      const user_id = SessionManager.getLoggedInUserId(req.session)
+      if (!user_id) throw new Error('no logged-in user')
+      await ChatApiHandler.promises.deleteUserMessage(project_id, thread_id, user_id, message_id)
+      EditorRealTimeController.emitToRoom(project_id, 'delete-message', thread_id, message_id)
+      res.sendStatus(204)
+    } catch (err) {
+      next(err)
+    }
+  },
   async resolveThread(req, res, next) {
     try {
       const { project_id, doc_id, thread_id } = req.params
