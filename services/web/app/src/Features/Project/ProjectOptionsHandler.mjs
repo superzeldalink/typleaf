@@ -16,7 +16,11 @@ const ProjectOptionsHandler = {
    */
   normalizeCompiler(compiler) {
     compiler = compiler.toLowerCase()
-    if (!settings.safeCompilers.includes(compiler)) {
+    // Validate against this fork's Typst-only list, not settings.safeCompilers.
+    // Upstream #32455 switched this check to settings.safeCompilers, which is
+    // the LaTeX-only list, so the compiler dropdown (which offers Typst alone)
+    // could never be saved.
+    if (!safeCompilers.includes(compiler)) {
       throw new OError('invalid compiler', { compiler })
     }
     return compiler
