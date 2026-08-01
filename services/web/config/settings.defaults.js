@@ -122,6 +122,13 @@ const httpPermissionsPolicy = {
 
 const safeCompilers = ['xelatex', 'pdflatex', 'latex', 'lualatex']
 
+// Cipher label for link-sharing invite tokens. The label is stored as a prefix
+// on each encrypted token so old tokens stay decryptable after a key rotation;
+// the "-vN" suffix selects the scheme, and access-token-encryptor only
+// implements v3. Change this only alongside a new secret.
+const inviteTokenCipherLabel =
+  process.env.OVERLEAF_INVITE_TOKEN_CIPHER_LABEL || '2026.1-v3'
+
 module.exports = {
   env: 'server-ce',
 
@@ -412,6 +419,21 @@ module.exports = {
     sessionSecretFallback: process.env.SESSION_SECRET_FALLBACK,
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS, 10) || 12,
   }, // number of rounds used to hash user passwords (raised to power 2)
+
+  // Encryption for reusable link-sharing invite tokens.
+  // CollaboratorsInviteHelper builds an @overleaf/access-token-encryptor from
+  // this; without it, createSharingLinkInvite throws and share links cannot be
+  // created. Invites sent by email do not use encryption and work regardless.
+  // Left undefined when no secret is configured, so the startup log line
+  // pointing at OVERLEAF_INVITE_TOKEN_SECRET is accurate.
+  projectInviteEncryptorOptions: process.env.OVERLEAF_INVITE_TOKEN_SECRET
+    ? {
+        cipherLabel: inviteTokenCipherLabel,
+        cipherPasswords: {
+          [inviteTokenCipherLabel]: process.env.OVERLEAF_INVITE_TOKEN_SECRET,
+        },
+      }
+    : undefined,
 
   adminUrl: process.env.ADMIN_URL,
   adminOnlyLogin: process.env.ADMIN_ONLY_LOGIN === 'true',

@@ -162,6 +162,11 @@ services:
       - EMAIL_CONFIRMATION_DISABLED=true
       - NODE_ENV=development
       - OVERLEAF_ALLOW_PUBLIC_ACCESS=true
+      # Encrypts reusable link-sharing invite tokens. Must be >= 16 chars.
+      # The default below is dev-only and deliberately not a secret; for a
+      # deployed instance set a real random value in develop/.env, which is
+      # gitignored, e.g. OVERLEAF_INVITE_TOKEN_SECRET=$(openssl rand -hex 32)
+      - OVERLEAF_INVITE_TOKEN_SECRET=${OVERLEAF_INVITE_TOKEN_SECRET:-dev-only-insecure-invite-token-secret}
     command: ["node", "app.mjs"]
     volumes:
       - sharelatex-data:/var/lib/overleaf
