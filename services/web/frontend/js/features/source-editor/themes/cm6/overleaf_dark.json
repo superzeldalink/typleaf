@@ -55,7 +55,7 @@
       "color": "#f1fa8c"
     },
     ".tok-comment": {
-      "color": "#8b9dc9"
+      "color": "#6272a4"
     },
     ".tok-attributeValue": {
       "color": "#ffb86c",
