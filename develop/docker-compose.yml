@@ -25,7 +25,14 @@ services:
     env_file:
       - dev.env
     environment:
-      - SANDBOXED_COMPILES=true
+      # Kept false for the Typst fork: sandboxed compiles run each build in a
+      # separate TEX_LIVE_DOCKER_IMAGE container, which has no `typst` binary.
+      # The typst binary is installed into the CLSI image itself (final stage of
+      # services/clsi/Dockerfile), so compiles must run in-container.
+      # To enable sandboxing you must also publish a Typst-capable image and set
+      # TYPST_IMAGE — LatexRunner.js falls back to it for compiler === 'typst'.
+      # This overrides SANDBOXED_COMPILES in dev.env (environment beats env_file).
+      - SANDBOXED_COMPILES=false
       - DOWNLOAD_HOST=http://clsi-nginx:8080
     user: root
     volumes:
