@@ -194,7 +194,7 @@ export const ReferencesProvider: FC<React.PropsWithChildren> = ({
         return { hits: [] }
       }
       const indexer = await indexerRef.current
-      return await indexer.search(query, 'searchLocalReferences')
+      return await indexer.search(query)
     },
     []
   )

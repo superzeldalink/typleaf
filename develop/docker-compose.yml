@@ -25,7 +25,8 @@ services:
     env_file:
       - dev.env
     environment:
-      - SANDBOXED_COMPILES=false
+      - SANDBOXED_COMPILES=true
+      - DOWNLOAD_HOST=http://clsi-nginx:8080
     user: root
     volumes:
       - ${PWD}/compiles:/overleaf/services/clsi/compiles
@@ -90,6 +91,13 @@ services:
     volumes:
       - history-v1-buckets:/buckets
 
+  linked-url-proxy:
+    build:
+      context: ..
+      dockerfile: services/linked-url-proxy/Dockerfile
+    env_file:
+      - dev.env
+
   mongo:
     image: mongo:8
     command: --replSet overleaf
@@ -143,7 +151,7 @@ services:
       - dev.env
     environment:
       - APP_NAME=Overleaf Community Edition
-      - ENABLED_LINKED_FILE_TYPES=project_file,project_output_file
+      - ENABLED_LINKED_FILE_TYPES=project_file,project_output_file,url,mendeley,zotero
       - EMAIL_CONFIRMATION_DISABLED=true
       - NODE_ENV=development
       - OVERLEAF_ALLOW_PUBLIC_ACCESS=true
@@ -151,6 +159,7 @@ services:
     volumes:
       - sharelatex-data:/var/lib/overleaf
       - web-data:/overleaf/services/web/data
+      - ./data/certs/:/var/lib/overleaf/certs/
     depends_on:
       - mongo
       - redis
@@ -160,6 +169,7 @@ services:
       - document-updater
       - filestore
       - history-v1
+      - linked-url-proxy
       - notifications
       - project-history
       - real-time
@@ -175,3 +185,62 @@ services:
       - "80:3808"
     volumes:
       - ./webpack.config.dev-env.js:/overleaf/services/web/webpack.config.dev-env.js
+
+  git-bridge:
+    image: quay.io/sharelatex/git-bridge:latest
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    environment:
+      GIT_BRIDGE_API_BASE_URL: "http://web:3000/api/v0"
+      GIT_BRIDGE_OAUTH2_SERVER: "http://web:3000"
+      GIT_BRIDGE_POSTBACK_BASE_URL: "http://git-bridge:8000"
+      GIT_BRIDGE_ROOT_DIR: "/data/git-bridge"
+      LOG_LEVEL: "DEBUG"
+    volumes:
+      - ./data/git-bridge:/data/git-bridge
+  
+# services: 
+  # Overleaf Dev Containers
+  # ...
+  
+  # Add those for your development
+  # API debug
+  hoppscotch-frontend:
+    image: hoppscotch/hoppscotch-frontend:latest
+    ports:
+      - "3000:3000"
+
+  hoppscotch-proxy:
+    image: hoppscotch/proxyscotch:latest
+    environment:
+      - PORT=9159
+    ports:
+      - "9159:9159"
+
+
+  # Redis-insight
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    ports:
+      - "5540:5540"
+    depends_on:
+      - redis
+    volumes:
+      - ./data/redis-insight:/data
+
+  # mongo-express
+  # basicAuth credentials are "admin:pass"
+  mongo-express:
+    image: mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+  
+  # For ldap testing
+  # https://github.com/rroemhild/docker-test-openldap
+  ldap:
+    restart: always
+    image: ghcr.io/rroemhild/docker-test-openldap:v2.5.0

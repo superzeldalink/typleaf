@@ -173,6 +173,8 @@ const settings = {
     clsiCacheDir: Path.join(DATA_DIR, 'cache'),
     // Where to write the output files to disk after running LaTeX
     outputDir: Path.join(DATA_DIR, 'output'),
+    // Where to cache learn pages
+    learnPagesFolder: Path.join(DATA_DIR, 'learnPages'),
   },
 
   // Server Config
@@ -307,7 +309,7 @@ const settings = {
 
 // This secret is used for encrypting sharing link tokens in the database
 if (process.env.OVERLEAF_INVITE_TOKEN_SECRET) {
-  module.exports.projectInviteEncryptorOptions = {
+  settings.projectInviteEncryptorOptions = {
     cipherLabel: '2026.3-v3',
     cipherPasswords: {
       '2026.3-v3': process.env.OVERLEAF_INVITE_TOKEN_SECRET,

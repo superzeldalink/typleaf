@@ -279,6 +279,9 @@ module.exports = {
     realTime: {
       url: `http://${process.env.REALTIME_HOST || '127.0.0.1'}:3026`,
     },
+    linkedUrlProxy: {
+      url: `http://${process.env.LINKED_URL_PROXY_HOST || '127.0.0.1'}:3066`,
+    },
     notifications: {
       url: `http://${process.env.NOTIFICATIONS_HOST || '127.0.0.1'}:3042`,
     },
@@ -318,6 +321,7 @@ module.exports = {
     // For legacy reasons, we need to populate the below objects.
     v1: {},
     recurly: {},
+
   },
 
   // Defines which features are allowed in the
@@ -387,7 +391,7 @@ module.exports = {
     process.env.PROJECT_UPLOAD_TIMEOUT || '120000',
     10
   ),
-  maxUploadSize: 50 * 1024 * 1024, // 50 MB
+  maxUploadSize: parseInt(process.env.MAX_UPLOAD_SIZE || '50', 10) * 1024 * 1024, // MB
   multerOptions: {
     preservePath: process.env.MULTER_PRESERVE_PATH,
   },
@@ -800,6 +804,7 @@ module.exports = {
     // them to disk here).
     dumpFolder: Path.resolve(__dirname, '../data/dumpFolder'),
     uploadFolder: Path.resolve(__dirname, '../data/uploads'),
+    learnPagesFolder: Path.resolve(__dirname, '../data/learnPages'),
   },
 
   // Automatic Snapshots
@@ -1028,14 +1033,39 @@ module.exports = {
     //
     // Restart webpack after making changes.
     //
-    createFileModes: [],
+    createFileModes: [
+      Path.resolve(
+        __dirname,
+        '../modules/zotero/frontend/js/components/zotero-create-file'
+      ),
+    ],
     devToolbar: [],
     gitBridge: [],
     publishModal: [],
-    tprFileViewInfo: [],
-    tprFileViewRefreshError: [],
-    tprFileViewRefreshButton: [],
-    tprFileViewNotOriginalImporter: [],
+    tprFileViewInfo: [
+      Path.resolve(
+        __dirname,
+        '../modules/zotero/frontend/js/components/tpr-file-view-info'
+      ),
+    ],
+    tprFileViewRefreshError: [
+      Path.resolve(
+        __dirname,
+        '../modules/zotero/frontend/js/components/tpr-file-view-refresh-error'
+      ),
+    ],
+    tprFileViewRefreshButton: [
+      Path.resolve(
+        __dirname,
+        '../modules/zotero/frontend/js/components/tpr-file-view-refresh-button'
+      ),
+    ],
+    tprFileViewNotOriginalImporter: [
+      Path.resolve(
+        __dirname,
+        '../modules/zotero/frontend/js/components/tpr-file-view-not-original-importer'
+      ),
+    ],
     contactUsModal: [],
     sourceEditorExtensions: [],
     sourceEditorVisualExtensions: [],
@@ -1046,26 +1076,81 @@ module.exports = {
     pdfPreviewPromotions: [],
     diagnosticActions: [],
     sourceEditorCompletionSources: [],
-    sourceEditorSymbolPalette: [],
+    sourceEditorSymbolPalette: [
+      Path.resolve(
+        __dirname,
+        '../modules/symbol-palette/frontend/js/components/symbol-palette'
+      ),
+    ],
     sourceEditorToolbarStartButtons: [],
     sourceEditorToolbarButtonGroups: [],
     sourceEditorToolbarComponents: [],
     sourceEditorToolbarEndButtons: [],
     rootContextProviders: [],
-    mainEditorLayoutModals: [],
+    mainEditorLayoutModals: [
+      Path.resolve(
+        __dirname,
+        '../modules/reference-picker/frontend/js/components/reference-picker-controller.tsx'
+      ),
+    ],
     mainEditorLayoutPanels: [],
-    pythonRunner: [],
+    pythonRunner: [
+      Path.resolve(
+        __dirname,
+        '../modules/python-runner/frontend/js/components/layout/python-editor-split'
+      ),
+    ],
     langFeedbackLinkingWidgets: [],
     labsExperiments: [],
-    integrationLinkingWidgets: [],
-    referenceLinkingWidgets: [],
-    importProjectFromGithubModalWrapper: [],
-    importProjectFromGithubMenu: [],
-    editorLeftMenuSync: [],
-    editorLeftMenuManageTemplate: [],
-    menubarExtraComponents: [],
+    integrationLinkingWidgets: [
+      Path.resolve(
+        __dirname,
+        '../modules/github-sync/frontend/js/components/github-sync-widget.tsx'
+      ),
+    ],
+    referenceLinkingWidgets: [
+      Path.resolve(
+        __dirname,
+        '../modules/zotero/frontend/js/components/zotero-widget'
+      ),
+    ],
+    importProjectFromGithubModalWrapper: [
+      Path.resolve(
+        __dirname,
+        '../modules/github-sync/frontend/js/components/import-from-github-modal-wrapper.tsx'
+      ),
+    ],
+    importProjectFromGithubMenu: [
+      Path.resolve(
+        __dirname,
+        '../modules/github-sync/frontend/js/components/import-from-github-menu.tsx'
+      ),
+    ],
+    editorLeftMenuSync: [
+      Path.resolve(
+        __dirname,
+        '../modules/git-bridge/frontend/js/components/git-bridge-modal.tsx'
+      ),
+    ],
+    editorLeftMenuManageTemplate: [
+      Path.resolve(
+        __dirname,
+        '../modules/template-gallery/frontend/js/components/actions-manage-template.tsx'
+      ),
+    ],
+    menubarExtraComponents: [
+      Path.resolve(
+        __dirname,
+        '../modules/template-gallery/frontend/js/components/menubar-manage-template.tsx'
+      ),
+    ],
     insertMenuSections: [],
-    oauth2Server: [],
+    oauth2Server: [
+      Path.resolve(
+        __dirname,
+        '../modules/oauth2-server/frontend/js/components/git-integration.tsx'
+      )
+    ],
     managedGroupSubscriptionEnrollmentNotification: [],
     managedGroupEnrollmentInvite: [],
     ssoCertificateInfo: [],
@@ -1076,12 +1161,25 @@ module.exports = {
     rollingBuildsUpdatedAlert: [],
     offlineModeToolbarButtons: [],
     settingsEntries: [],
-    autoCompleteExtensions: [],
+    autoCompleteExtensions: [
+      Path.resolve(
+        __dirname,
+        '../modules/reference-picker/frontend/js/extensions/reference-picker-keybinding.ts'
+      ),
+      Path.resolve(
+        __dirname,
+        '../modules/reference-picker/frontend/js/extensions/reference-search-hint.ts'
+      ),
+    ],
     sectionTitleGenerators: [],
     toastGenerators: [
       Path.resolve(
         __dirname,
         '../frontend/js/features/pdf-preview/components/synctex-toasts'
+      ),
+      Path.resolve(
+        __dirname,
+        '../modules/python-runner/frontend/js/components/editor/python/python-output-toasts'
       ),
     ],
     editorSidebarComponents: [
@@ -1102,12 +1200,30 @@ module.exports = {
         '../modules/full-project-search/frontend/js/components/full-project-search.tsx'
       ),
     ],
-    integrationPanelComponents: [],
+    integrationPanelComponents: [
+      Path.resolve(
+        __dirname,
+        '../modules/git-bridge/frontend/js/components/git-bridge-integration-card.tsx'
+      ),
+      Path.resolve(
+        __dirname,
+        '../modules/github-sync/frontend/js/components/github-integration-card.tsx'
+      ),
+      Path.resolve(
+        __dirname,
+        '../modules/zotero/frontend/js/components/zotero-integration-card.tsx'
+      ),
+    ],
     referenceSearchSetting: [],
     settingsModalEditorTabSections: [],
     settingsModalSpellcheckSections: [],
     editorFloatingMenuActions: [],
-    referenceIndices: [],
+    referenceIndices: [
+      Path.resolve(
+        __dirname,
+        '../modules/reference-picker/frontend/js/reference-index/advanced-reference-index.ts'
+      ),
+    ],
     railEntries: [],
     railPopovers: [],
     railActions: [],
@@ -1117,8 +1233,24 @@ module.exports = {
   moduleImportSequence: [
     'history-v1',
     'launchpad',
+    'learn',
     'server-ce-scripts',
+    'authentication/ldap',
+    'authentication/saml',
+    'authentication/oidc',
+    'admin-tools',
     'user-activate',
+    'sandboxed-compiles',
+    'symbol-palette',
+    'track-changes',
+    'template-gallery',
+    'login-register',
+    'oauth2-server',
+    'reference-picker',
+    'git-bridge',
+    'github-sync',
+    'zotero',
+    'instance-features'
   ],
   viewIncludes: {},
 
@@ -1132,7 +1264,8 @@ module.exports = {
       'app/views/project/ide-react': [`img-src 'self' data: blob:`],
     },
   },
-
+  enableGitBridge: process.env.GIT_BRIDGE_ENABLED === 'true',
+  enableGithubSync: process.env.GITHUB_SYNC_ENABLED === 'true',
   unsupportedBrowsers: {
     ie: '<=11',
     safari: '<15',
@@ -1151,4 +1284,30 @@ module.exports = {
 
 module.exports.mergeWith = function (overrides) {
   return merge(overrides, module.exports)
+}
+
+module.exports.splitTestOverrides = {
+  'history-ranges-support': 'enabled',
+  'revert-file': 'enabled',
+  'revert-project': 'enabled',
+  'overleaf-code': 'enabled',
+  'editor-tabs': 'enabled',
+  'import-docx': 'enabled',
+  'import-markdown': 'enabled',
+  'export-docx': 'enabled',
+  'export-markdown': 'enabled',
+  'export-html': 'enabled'
+}
+
+module.exports.oauthProviders = {
+  ...(process.env.EXTERNAL_AUTH && process.env.EXTERNAL_AUTH.includes('oidc') && {
+    [process.env.OVERLEAF_OIDC_PROVIDER_ID || 'oidc']: {
+      name: process.env.OVERLEAF_OIDC_PROVIDER_NAME || 'OIDC Provider',
+      descriptionKey: process.env.OVERLEAF_OIDC_PROVIDER_DESCRIPTION,
+      descriptionOptions: { link: process.env.OVERLEAF_OIDC_PROVIDER_INFO_LINK },
+      hideWhenNotLinked: process.env.OVERLEAF_OIDC_PROVIDER_HIDE_NOT_LINKED ?
+        process.env.OVERLEAF_OIDC_PROVIDER_HIDE_NOT_LINKED.toLowerCase() === 'true' : undefined,
+      linkPath: '/oidc/login',
+    },
+  }),
 }

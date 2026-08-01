@@ -565,9 +565,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@aws-sdk/client-ses@npm:3.994.0":
+"@aws-sdk/client-sesv2@npm:3.994.0":
   version: 3.994.0
-  resolution: "@aws-sdk/client-ses@npm:3.994.0"
+  resolution: "@aws-sdk/client-sesv2@npm:3.994.0"
   dependencies:
     "@aws-crypto/sha256-browser": "npm:5.2.0"
     "@aws-crypto/sha256-js": "npm:5.2.0"
@@ -578,6 +578,7 @@ __metadata:
     "@aws-sdk/middleware-recursion-detection": "npm:^3.972.3"
     "@aws-sdk/middleware-user-agent": "npm:^3.972.11"
     "@aws-sdk/region-config-resolver": "npm:^3.972.3"
+    "@aws-sdk/signature-v4-multi-region": "npm:3.994.0"
     "@aws-sdk/types": "npm:^3.973.1"
     "@aws-sdk/util-endpoints": "npm:3.994.0"
     "@aws-sdk/util-user-agent-browser": "npm:^3.972.3"
@@ -607,9 +608,8 @@ __metadata:
     "@smithy/util-middleware": "npm:^4.2.8"
     "@smithy/util-retry": "npm:^4.2.8"
     "@smithy/util-utf8": "npm:^4.2.0"
-    "@smithy/util-waiter": "npm:^4.2.8"
     tslib: "npm:^2.6.2"
-  checksum: 10c0/368b9b19c563d90925263a7f71b2bd7da503a1776e4b4b8ba8de997c191ff696254d782e57923252acfa6ab47cb6066efdab8e8904e32a19055a497f396f45b3
+  checksum: 10c0/2d024a53bce028ff12772c04b5c5a423804415230ca698eff15a164898c47614e03a8e2a91d49351b539a58d260b91ba6d6559942f5e4a2c7704d832ea18eefa
   languageName: node
   linkType: hard
 
@@ -4115,12 +4115,12 @@ __metadata:
   linkType: hard
 
 "@grpc/grpc-js@npm:^1.1.8, @grpc/grpc-js@npm:^1.10.9, @grpc/grpc-js@npm:^1.11.1, @grpc/grpc-js@npm:^1.14.3":
-  version: 1.14.3
-  resolution: "@grpc/grpc-js@npm:1.14.3"
+  version: 1.14.4
+  resolution: "@grpc/grpc-js@npm:1.14.4"
   dependencies:
     "@grpc/proto-loader": "npm:^0.8.0"
     "@js-sdsl/ordered-map": "npm:^4.4.2"
-  checksum: 10c0/f41f06a311b93cca8c472d56e21387e0f7b57bb2337a91d15ea4279bac8ec4fa0de6bd0d881201229ab800c0f0c55277911ecb850e057f20a828d0ddd623551d
+  checksum: 10c0/0ff6395e8112ad30e8f99dbb684b997ebc3264e770b8e354f23effeedf181a380e0ecef8bca466cbbf3e9141968656144851de1da50f840a1efd9314c9812449
   languageName: node
   linkType: hard
 
@@ -6705,7 +6705,7 @@ __metadata:
     mocha: "npm:^11.1.0"
     mocha-junit-reporter: "npm:^2.2.1"
     mocha-multi-reporters: "npm:^1.5.1"
-    multer: "npm:2.1.1"
+    multer: "npm:2.2.0"
     node-fetch: "npm:^2.7.0"
     nyc: "npm:^17.1.0"
     overleaf-editor-core: "workspace:*"
@@ -7426,7 +7426,7 @@ __metadata:
     "@ai-sdk/mcp": "patch:@ai-sdk/mcp@npm%3A1.0.37#~/.yarn/patches/@ai-sdk-mcp-npm-1.0.37-8cd89b8972.patch"
     "@ai-sdk/openai": "npm:^3.0.54"
     "@ai-sdk/react": "npm:^3.0.172"
-    "@aws-sdk/client-ses": "npm:^3.994.0"
+    "@aws-sdk/client-sesv2": "npm:3.994.0"
     "@babel/core": "npm:^7.28.5"
     "@babel/plugin-proposal-decorators": "npm:^7.28.0"
     "@babel/preset-env": "npm:^7.28.5"
@@ -7676,7 +7676,7 @@ __metadata:
     moment: "npm:^2.29.4"
     mongodb-legacy: "npm:6.1.3"
     mongoose: "npm:8.22.1"
-    multer: "npm:2.1.1"
+    multer: "npm:2.2.0"
     nocache: "npm:^2.1.0"
     nock: "npm:^13.5.6"
     node-fetch: "npm:^2.7.0"
@@ -19366,17 +19366,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"form-data@npm:2.5.5, form-data@npm:^2.5.5":
-  version: 2.5.5
-  resolution: "form-data@npm:2.5.5"
+"form-data@npm:2.5.6":
+  version: 2.5.6
+  resolution: "form-data@npm:2.5.6"
   dependencies:
     asynckit: "npm:^0.4.0"
     combined-stream: "npm:^1.0.8"
     es-set-tostringtag: "npm:^2.1.0"
-    hasown: "npm:^2.0.2"
+    hasown: "npm:^2.0.4"
     mime-types: "npm:^2.1.35"
     safe-buffer: "npm:^5.2.1"
-  checksum: 10c0/7fb70447849fc9bce4d01fe9a626f6587441f85779a2803b67f803e1ab52b0bd78db0a7acd80d944c665f68ca90936c327f1244b730719b638a0219e98b20488
+  checksum: 10c0/de6b085a2b0d013299ccc888b677dbdb3d2a54ef8d74982bda9ad7d928f57440abae1bc736a5b85ea01077cfb6c72e9a7752dc786304271c03bd0013ef8f08cb
   languageName: node
   linkType: hard
 
@@ -20410,6 +20410,15 @@ __metadata:
   dependencies:
     function-bind: "npm:^1.1.2"
   checksum: 10c0/3769d434703b8ac66b209a4cca0737519925bbdb61dd887f93a16372b14694c63ff4e797686d87c90f08168e81082248b9b028bad60d4da9e0d1148766f56eb9
+  languageName: node
+  linkType: hard
+
+"hasown@npm:^2.0.4":
+  version: 2.0.4
+  resolution: "hasown@npm:2.0.4"
+  dependencies:
+    function-bind: "npm:^1.1.2"
+  checksum: 10c0/2d8de939e270b70618f8cebb69746620db10617dbb495bc66ddad326955ea24d3ca4af133aff3eb7c1853e0218f867bc2b050ec26fe02e3aea58f880ffc5e506
   languageName: node
   linkType: hard
 
@@ -25276,27 +25285,27 @@ __metadata:
   languageName: node
   linkType: hard
 
-"multer@npm:2.1.1":
-  version: 2.1.1
-  resolution: "multer@npm:2.1.1"
+"multer@npm:2.2.0":
+  version: 2.2.0
+  resolution: "multer@npm:2.2.0"
   dependencies:
     append-field: "npm:^1.0.0"
     busboy: "npm:^1.6.0"
     concat-stream: "npm:^2.0.0"
     type-is: "npm:^1.6.18"
-  checksum: 10c0/2ec4e02833b20f403cfb879d4b64d2a9070d902b9deae7aef18a6faadb707d7665385456cf540aa8a6dadfe3d4c5fc8e0e7b0675b94e1077048b1125426deee6
+  checksum: 10c0/7aa366d89042427347b6ab8e4a203405d7fe942e4a3095648a14526fcf3691d98ffc2da62abf85d8aca0a341f828168eb197b33cfdcfcce29d6ef593a5625591
   languageName: node
   linkType: hard
 
-"multer@patch:multer@npm%3A2.1.1#~/.yarn/patches/multer-npm-2.1.1.patch":
-  version: 2.1.1
-  resolution: "multer@patch:multer@npm%3A2.1.1#~/.yarn/patches/multer-npm-2.1.1.patch::version=2.1.1&hash=0a6fed"
+"multer@patch:multer@npm%3A2.2.0#~/.yarn/patches/multer-npm-2.2.0-4ed181c78f.patch":
+  version: 2.2.0
+  resolution: "multer@patch:multer@npm%3A2.2.0#~/.yarn/patches/multer-npm-2.2.0-4ed181c78f.patch::version=2.2.0&hash=cf9e1c"
   dependencies:
     append-field: "npm:^1.0.0"
     busboy: "npm:^1.6.0"
     concat-stream: "npm:^2.0.0"
     type-is: "npm:^1.6.18"
-  checksum: 10c0/647285a1c53531143d44d54ce923d3fca2037f368e581c9eecfa8b40aa5a8ef706fb1ed2a5635228002c38e31861d6209ab33a07d194c8768e7ae113b7a67976
+  checksum: 10c0/9aa266ba976e6ee0d292d4b838d7e957086bcfb53fa170b62ca26d8737cc5eb2fc066fba0045895cbce6981a467adc0f801685b5528e8d1d09e00ca1544163dc
   languageName: node
   linkType: hard
 

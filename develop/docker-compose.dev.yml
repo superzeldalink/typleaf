@@ -9,6 +9,7 @@ services:
       - ../services/clsi/app:/overleaf/services/clsi/app
       - ../services/clsi/app.js:/overleaf/services/clsi/app.js
       - ../services/clsi/config:/overleaf/services/clsi/config
+      - ../services/clsi/seccomp:/overleaf/services/clsi/seccomp
 
   chat:
     command: ["node", "--watch", "app.js"]
@@ -67,6 +68,17 @@ services:
       - ../services/history-v1/storage:/overleaf/services/history-v1/storage
       - ../services/history-v1/knexfile.js:/overleaf/services/history-v1/knexfile.js
       - ../services/history-v1/migrations:/overleaf/services/history-v1/migrations
+
+  linked-url-proxy:
+    command: ["node", "--watch", "app.mjs"]
+    environment:
+      - NODE_OPTIONS=--inspect=0.0.0.0:9229
+    ports:
+      - "127.0.0.1:9241:9229"
+    volumes:
+      - ../services/linked-url-proxy/app:/overleaf/services/linked-url-proxy/app
+      - ../services/linked-url-proxy/config:/overleaf/services/linked-url-proxy/config
+      - ../services/linked-url-proxy/app.mjs:/overleaf/services/linked-url-proxy/app.mjs
 
   notifications:
     command: ["node", "--watch", "app.ts"]
