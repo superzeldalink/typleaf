@@ -86,6 +86,12 @@ const settings = {
       : undefined,
 
     allowRedirects: process.env.ALLOW_REDIRECTS === 'true',
+
+    // Mirrors the `persistor.useSubdirectories` setting that history-v1 reads
+    // from NODE_CONFIG. history-v1 writes project blobs as nested directories
+    // when it is on; filestore serves those same blobs, so its FSPersistor has
+    // to agree or _getFsPath flattens "/" to "_" and every lookup 404s.
+    useSubdirectories: process.env.USE_SUBDIRECTORIES === 'true',
   },
 
   path: {
