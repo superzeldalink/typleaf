@@ -6,14 +6,77 @@ import OError from "@overleaf/o-error";
 import CommandRunner from "./CommandRunner.js";
 
 const TYPST_SYNC_MAP = "output.typst-sync.json";
-const TYPST_SYNC_QUERY = ".output.typst-sync.query.typ";
 const TYPST_SYNC_LABEL = "<ol-typst-sync>";
+const TYPST_SYNC_MAP_LABEL = "<ol-typst-sync-map>";
+
+// A marker is a zero-size `metadata` tag, so it can be spliced into the middle
+// of a line without changing layout, paragraph grouping or line numbering.
+const MARKER_PATTERN =
+  /#\[#metadata\(\(f:"(?:[^"\\]|\\.)*",l:\d+\)\)<ol-typst-sync>\]\/\*\*\//g;
 
 const DEFAULT_HIGHLIGHT_SIZE = {
   heading: { width: 180, height: 30 },
   paragraph: { width: 220, height: 34 },
   figure: { width: 220, height: 40 },
+  list: { width: 220, height: 24 },
+  cell: { width: 120, height: 20 },
 };
+
+// Keywords that start a statement rather than a self-contained expression:
+// `#foo` ends at the first character that cannot continue it, but `#let x = 5`
+// runs to the end of the line.
+const STATEMENT_KEYWORDS = new Set([
+  "let",
+  "set",
+  "show",
+  "import",
+  "include",
+  "if",
+  "else",
+  "for",
+  "while",
+  "context",
+  "return",
+  "break",
+  "continue",
+]);
+
+// Statements emit nothing visible, and a tag placed before `#set page(...)`
+// risks materialising the page before the rule applies. Nothing to anchor.
+const SKIPPED_STATEMENT = /^#(let|set|show|import|include)\b/;
+
+// Content blocks belonging to these are templates -- a page header, a show
+// rule body, a reusable snippet. Their source lines are rendered wherever the
+// template is used, so anchoring them points a click at the definition rather
+// than at the text the reader clicked on.
+const DEFINITION_KEYWORDS = new Set(["let", "set", "show"]);
+
+// `= Heading` and `- item` are only parsed as such when they are the first
+// thing on the line, so their markers go after the token, not before it.
+const HEADING_PREFIX = /^(=+)(\s+)/;
+const LIST_PREFIX = /^([-+]|\d+\.|\/)(\s+)/;
+
+// A line of nothing but closing delimiters carries no content to anchor, and
+// one that merely starts with a closer (`] else [`) is finishing off the block
+// above it -- a marker there lands at the end of the previous block, not the
+// start of a new one.
+const CLOSERS_ONLY = /^[\])}\s,;]*$/;
+const LEADING_CLOSER = /^[\])}]/;
+
+// A label attaches to whatever precedes it, so a marker injected in front of
+// one steals it: the project's `<overview>` would end up on our metadata
+// instead of on the heading, and every `@overview` with it.
+const LEADING_LABEL = /^<[^\s<>]+>/;
+
+const IDENT_CHAR = /[A-Za-z0-9_-]/;
+
+// Positional content blocks of a table or grid are its cells. Anchoring them
+// is the only way a click inside a table can resolve to source.
+const CELL_OWNER = /^(table|grid)(\.(cell|header|footer))?$/;
+
+// A hash expression cannot span a line break on its own, but a line ending in
+// an operator is a continuation, so the expression stays open.
+const TRAILING_OPERATOR = /[+\-*/=<>|,:]\s*$/;
 
 function getSyncMapPath(directory) {
   return Path.join(directory, TYPST_SYNC_MAP);
@@ -37,263 +100,480 @@ function resolveIncludedPath(baseFile, includePath) {
   return normalizeProjectPath(candidate);
 }
 
-function normalizeTypstInline(value) {
-  if (typeof value !== "string") return "";
-  return value
-    .replace(/^sequence\(/, "")
-    .replace(/\)$/, "")
-    .replace(/\[(.*?)\]/gs, "$1")
-    .replace(/,\s*/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+// Two wrappers, each fixing a different way the marker gets misparsed:
+//
+// The content block, because a bare label at the start of a heading or a figure
+// caption attaches to the *enclosing* element instead of the metadata, and
+// `query` then hands back a heading with no `value` field.
+//
+// The empty comment, because a content block is still a callable expression: a
+// line of prose starting with "(" would turn into `#[...](default 2 ppc)`, a
+// call with the paragraph as its arguments. The same goes for a following "["
+// or ".". A comment is trivia -- it ends the expression and renders nothing,
+// not even a word space.
+function buildMarker(file, line) {
+  return `#[#metadata((f:${JSON.stringify(file)},l:${line}))${TYPST_SYNC_LABEL}]/**/`;
 }
 
-function normalizeSourceText(value) {
-  return value.replace(/\s+/g, " ").trim();
+function stripMarkers(content) {
+  return content.replace(MARKER_PATTERN, "");
 }
 
-function getHeading(line) {
-  const match = line.match(/^(=+)\s+(.*?)\s*$/);
-  if (!match || !match[2]) return null;
+// One `context` block resolves every marker's position in a single pass. The
+// CLI's `typst query` cannot report an element's location, so the positions
+// have to be computed inside the document and stashed in a metadata value.
+function buildQueryBlock() {
+  return `#context [#metadata(query(${TYPST_SYNC_LABEL}).filter(it => it.func() == metadata).map(it => {
+  let pos = it.location().position()
+  (f: it.value.f, l: it.value.l, page: pos.page, x: pos.x, y: pos.y)
+}))${TYPST_SYNC_MAP_LABEL}]`;
+}
+
+function modeOf(frame) {
+  if (!frame) return "markup";
+  if (frame.kind === "content") return "markup";
+  if (frame.kind === "hash" || frame.kind === "paren" || frame.kind === "brace")
+    return "code";
+  return frame.kind;
+}
+
+// Tracks Typst's markup/code/math/raw modes well enough to answer two
+// questions: does this line start in markup (so a marker can be spliced in at
+// its first column), and where do table cells open. Getting this wrong is not
+// cosmetic -- a marker emitted into code mode is a syntax error that takes the
+// whole query compile down with it, so every uncertain case stays in code.
+function scanTypstSource(lines) {
+  const stack = [];
+  const startsInMarkup = [];
+  const cells = [];
+  const includes = [];
+  let lastIdent = "";
+
+  function frame() {
+    return stack[stack.length - 1];
+  }
+
+  function mode() {
+    return modeOf(frame());
+  }
+
+  function inDefinition() {
+    return stack.some((entry) => entry.definition);
+  }
+
+  function closeFrame(kind) {
+    const at = stack.map((entry) => entry.kind).lastIndexOf(kind);
+    if (at === -1) return;
+    stack.length = at;
+  }
+
+  // `#foo(x)` and `#table.cell[y]` both need the callee so a content block can
+  // tell whether it is a table cell.
+  function ownerOfContentBlock() {
+    const current = frame();
+    if (!current) return "";
+    if (current.kind === "hash" || current.kind === "paren")
+      return current.callee;
+    return "";
+  }
+
+  function readIdent(line, position) {
+    let name = "";
+    while (position < line.length) {
+      const char = line[position];
+      const next = line[position + 1] || "";
+      if (IDENT_CHAR.test(char)) {
+        name += char;
+        position += 1;
+      } else if (char === "." && IDENT_CHAR.test(next)) {
+        name += char;
+        position += 1;
+      } else {
+        break;
+      }
+    }
+    return { name, position };
+  }
+
+  function openRaw(line, position) {
+    let fence = 0;
+    while (line[position + fence] === "`") fence += 1;
+    // A bare pair of backticks is an empty raw span with nothing to close.
+    if (fence !== 2) stack.push({ kind: "raw", fence });
+    return position + fence;
+  }
+
+  function scanLine(line, index) {
+    let position = 0;
+
+    while (position < line.length) {
+      const char = line[position];
+      const next = line[position + 1] || "";
+      const current = mode();
+
+      if (current === "comment") {
+        const close = line.indexOf("*/", position);
+        if (close === -1) return;
+        stack.pop();
+        position = close + 2;
+        continue;
+      }
+
+      if (current === "raw") {
+        if (char !== "`") {
+          position += 1;
+          continue;
+        }
+        let run = 0;
+        while (line[position + run] === "`") run += 1;
+        if (run >= frame().fence) stack.pop();
+        position += run;
+        continue;
+      }
+
+      if (current === "string") {
+        if (char === "\\") {
+          position += 2;
+          continue;
+        }
+        if (char === '"') stack.pop();
+        position += 1;
+        continue;
+      }
+
+      if (current === "math") {
+        if (char === "\\") {
+          position += 2;
+          continue;
+        }
+        if (char === "$") stack.pop();
+        position += 1;
+        continue;
+      }
+
+      if (current === "markup") {
+        if (char === "\\") {
+          position += 2;
+          continue;
+        }
+        if (char === "/" && next === "/") return;
+        if (char === "/" && next === "*") {
+          stack.push({ kind: "comment" });
+          position += 2;
+          continue;
+        }
+        if (char === "`") {
+          position = openRaw(line, position);
+          continue;
+        }
+        if (char === "$") {
+          stack.push({ kind: "math" });
+          position += 1;
+          continue;
+        }
+        if (char === "]" && frame()?.kind === "content") {
+          stack.pop();
+          position += 1;
+          continue;
+        }
+        if (char === "#") {
+          const ident = readIdent(line, position + 1);
+          stack.push({
+            kind: "hash",
+            callee: ident.name,
+            keyword: STATEMENT_KEYWORDS.has(ident.name),
+            definition: DEFINITION_KEYWORDS.has(ident.name),
+          });
+          lastIdent = ident.name;
+          position = ident.position;
+          continue;
+        }
+        position += 1;
+        continue;
+      }
+
+      // code
+      if (char === "/" && next === "/") return;
+      if (char === "/" && next === "*") {
+        stack.push({ kind: "comment" });
+        position += 2;
+        continue;
+      }
+      if (char === '"') {
+        stack.push({ kind: "string" });
+        position += 1;
+        continue;
+      }
+      if (char === "`") {
+        position = openRaw(line, position);
+        continue;
+      }
+      if (char === "$") {
+        stack.push({ kind: "math" });
+        position += 1;
+        continue;
+      }
+      if (char === "(") {
+        stack.push({ kind: "paren", callee: lastIdent });
+        lastIdent = "";
+        position += 1;
+        continue;
+      }
+      if (char === "{") {
+        stack.push({ kind: "brace" });
+        lastIdent = "";
+        position += 1;
+        continue;
+      }
+      if (char === "[") {
+        const owner = ownerOfContentBlock();
+        const definition = inDefinition();
+        stack.push({ kind: "content", definition });
+        position += 1;
+        if (!definition && CELL_OWNER.test(owner)) {
+          cells.push({ index, column: position });
+        }
+        continue;
+      }
+      if (char === ")") {
+        closeFrame("paren");
+        position += 1;
+        continue;
+      }
+      if (char === "}") {
+        closeFrame("brace");
+        position += 1;
+        continue;
+      }
+      if (char === "]") {
+        closeFrame("content");
+        position += 1;
+        continue;
+      }
+      if (IDENT_CHAR.test(char)) {
+        const ident = readIdent(line, position);
+        lastIdent = ident.name;
+        position = ident.position;
+        continue;
+      }
+      if (char === ".") {
+        position += 1;
+        continue;
+      }
+
+      // `#foo bar` is a call followed by markup: a bare hash expression ends at
+      // the first character that cannot continue it. A statement keyword runs
+      // to the end of the line instead, so it stays open.
+      const open = frame();
+      if (open?.kind === "hash" && !open.keyword) {
+        stack.pop();
+        continue;
+      }
+      position += 1;
+    }
+  }
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const markupAtStart = mode() === "markup" && !inDefinition();
+    startsInMarkup.push(markupAtStart);
+
+    if (markupAtStart) {
+      const include = line.trim().match(/^#include\s+"([^"]+)"\s*$/);
+      if (include) includes.push(include[1]);
+    }
+
+    scanLine(line, index);
+
+    if (!TRAILING_OPERATOR.test(line)) {
+      while (stack.length && frame().kind === "hash") stack.pop();
+    }
+  }
+
+  return { startsInMarkup, cells, includes };
+}
+
+function getLineStartInjection(line) {
+  const leading = line.match(/^\s*/)[0].length;
+  const rest = line.slice(leading);
+
+  if (rest === "") return null;
+  if (rest.startsWith("//") || rest.startsWith("/*")) return null;
+  if (rest.startsWith("`")) return null;
+  if (SKIPPED_STATEMENT.test(rest)) return null;
+  if (CLOSERS_ONLY.test(rest) || LEADING_CLOSER.test(rest)) return null;
+
+  const heading = rest.match(HEADING_PREFIX);
+  if (heading) {
+    return { column: leading + heading[0].length, kind: "heading" };
+  }
+
+  const listItem = rest.match(LIST_PREFIX);
+  if (listItem) {
+    return { column: leading + listItem[0].length, kind: "list" };
+  }
+
   return {
-    kind: "heading",
-    level: match[1].length,
-    title: normalizeSourceText(match[2]),
+    column: leading,
+    kind: /^#figure\b/.test(rest) ? "figure" : "paragraph",
   };
 }
 
-function getFigureStart(trimmed) {
-  return /^#figure\s*\(/.test(trimmed);
-}
+function collectInjectionPoints(lines) {
+  const { startsInMarkup, cells, includes } = scanTypstSource(lines);
+  const points = [];
 
-function shouldSkipLine(trimmed) {
-  return (
-    trimmed === "" ||
-    trimmed.startsWith("//") ||
-    trimmed === "{" ||
-    trimmed === "}" ||
-    trimmed === "]"
-  );
-}
-
-function getParenDepthDelta(line) {
-  let delta = 0;
-  let insideString = false;
-  let escaped = false;
-
-  for (const char of line) {
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (char === '"') {
-      insideString = !insideString;
-      continue;
-    }
-    if (insideString) continue;
-    if (char === "(") delta += 1;
-    if (char === ")") delta -= 1;
-  }
-
-  return delta;
-}
-
-function consumeFigureBlock(lines, startIndex) {
-  let depth = 0;
-  let sawOpen = false;
-  let endIndex = startIndex;
-
-  for (let index = startIndex; index < lines.length; index++) {
-    const line = lines[index];
-    depth += getParenDepthDelta(line);
-    if (line.includes("(")) {
-      sawOpen = true;
-    }
-    endIndex = index;
-    if (sawOpen && depth <= 0) {
-      break;
+  for (let index = 0; index < lines.length; index++) {
+    if (!startsInMarkup[index]) continue;
+    const point = getLineStartInjection(lines[index]);
+    if (point) {
+      points.push({ line: index + 1, column: point.column, kind: point.kind });
     }
   }
 
-  return endIndex;
+  for (const cell of cells) {
+    points.push({ line: cell.index + 1, column: cell.column, kind: "cell" });
+  }
+
+  return { points, includes };
 }
 
-function isParagraphCandidate(trimmed) {
-  if (shouldSkipLine(trimmed)) return false;
-  if (trimmed.startsWith("#include ")) return false;
-  if (trimmed.startsWith("```")) return false;
-  if (getHeading(trimmed)) return false;
-  if (getFigureStart(trimmed)) return false;
-  return true;
-}
+// Injects a marker at every anchorable position. Markers never shift a line
+// number, so the `l` they carry stays valid for the file they came from --
+// including through `#include`, since each file is injected with its own path.
+function injectMarkers(content, file) {
+  const lines = stripMarkers(content).split("\n");
+  const { points: candidates, includes } = collectInjectionPoints(lines);
 
-function buildParagraphText(lines) {
-  return normalizeSourceText(
-    lines
-      .map((line) => line.trim())
-      .join(" ")
-      .replace(/#\w+\(/g, "")
-      .replace(/[()[\]{}]/g, " "),
+  // Checked at the injection column rather than the line start, so it covers a
+  // table cell whose content opens with a label just as well as a label sitting
+  // on a line of its own.
+  const points = candidates.filter(
+    (point) => !LEADING_LABEL.test(lines[point.line - 1].slice(point.column)),
   );
+
+  const byLine = new Map();
+  for (const point of points) {
+    const existing = byLine.get(point.line);
+    if (existing) {
+      existing.push(point);
+    } else {
+      byLine.set(point.line, [point]);
+    }
+  }
+
+  // `injected` is how many markers this line really carries. Knowing it is what
+  // lets the query tell "a table row with three cells" apart from "one heading
+  // that an outline rendered a second time".
+  const kinds = new Map();
+  for (const [line, linePoints] of byLine) {
+    // Right to left, so an earlier column is still where the scanner saw it.
+    linePoints.sort((left, right) => right.column - left.column);
+    let text = lines[line - 1];
+    for (const point of linePoints) {
+      text =
+        text.slice(0, point.column) +
+        buildMarker(file, line) +
+        text.slice(point.column);
+    }
+    lines[line - 1] = text;
+    kinds.set(line, {
+      kind: linePoints[linePoints.length - 1].kind,
+      injected: linePoints.length,
+    });
+  }
+
+  return {
+    content: lines.join("\n"),
+    markerCount: points.length,
+    kinds,
+    includes,
+  };
 }
 
-async function collectSourceBlocks(compileDir, rootResourcePath) {
-  const blocks = [];
+// Rewrites the compile-dir copies of every `.typ` file reachable from the root
+// and remembers their original contents so the caller can put them back. The
+// user's own files are never touched -- the compile dir is a scratch copy.
+async function injectSyncMarkers(compileDir, rootResourcePath, originals) {
+  const kinds = new Map();
+  let markerCount = 0;
 
-  async function walk(filePath, stack = []) {
-    const normalizedFilePath = normalizeProjectPath(filePath);
-    if (stack.includes(normalizedFilePath)) {
-      logger.warn(
-        { normalizedFilePath, stack },
-        "skipping cyclic typst include",
-      );
+  async function walk(filePath, stack) {
+    const file = normalizeProjectPath(filePath);
+    if (stack.includes(file)) {
+      logger.warn({ file, stack }, "skipping cyclic typst include");
       return;
     }
 
-    const absolutePath = Path.join(compileDir, normalizedFilePath);
-    const content = await fsPromises.readFile(absolutePath, "utf8");
-    const lines = content.split("\n");
-    let insideCodeFence = false;
+    const absolutePath = Path.join(compileDir, file);
+    if (originals.has(absolutePath)) return;
 
-    for (let index = 0; index < lines.length; index++) {
-      const line = lines[index];
-      const trimmed = line.trim();
-
-      if (trimmed.startsWith("```")) {
-        insideCodeFence = !insideCodeFence;
-        continue;
+    let content;
+    try {
+      content = await fsPromises.readFile(absolutePath, "utf8");
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        logger.warn({ file }, "typst include not found, skipping sync markers");
+        return;
       }
+      throw error;
+    }
+    originals.set(absolutePath, content);
 
-      if (insideCodeFence) {
-        continue;
-      }
+    const injected = injectMarkers(content, file);
+    await fsPromises.writeFile(absolutePath, injected.content);
+    markerCount += injected.markerCount;
+    for (const [line, kind] of injected.kinds) {
+      kinds.set(`${file}:${line}`, kind);
+    }
 
-      const includeMatch = trimmed.match(/^#include\s+"([^"]+)"\s*$/);
-      if (includeMatch) {
-        await walk(resolveIncludedPath(normalizedFilePath, includeMatch[1]), [
-          ...stack,
-          normalizedFilePath,
-        ]);
-        continue;
-      }
-
-      const heading = getHeading(trimmed);
-      if (heading) {
-        blocks.push({
-          file: normalizedFilePath,
-          line: index + 1,
-          endLine: index + 1,
-          kind: heading.kind,
-          level: heading.level,
-          text: heading.title,
-        });
-        continue;
-      }
-
-      if (getFigureStart(trimmed)) {
-        const endIndex = consumeFigureBlock(lines, index);
-        blocks.push({
-          file: normalizedFilePath,
-          line: index + 1,
-          endLine: endIndex + 1,
-          kind: "figure",
-          text: normalizeSourceText(lines.slice(index, endIndex + 1).join(" ")),
-        });
-        index = endIndex;
-        continue;
-      }
-
-      if (!isParagraphCandidate(trimmed)) {
-        continue;
-      }
-
-      const startIndex = index;
-      let endIndex = index;
-      while (endIndex + 1 < lines.length) {
-        const nextTrimmed = lines[endIndex + 1].trim();
-        if (!isParagraphCandidate(nextTrimmed)) {
-          break;
-        }
-        endIndex += 1;
-      }
-
-      blocks.push({
-        file: normalizedFilePath,
-        line: startIndex + 1,
-        endLine: endIndex + 1,
-        kind: "paragraph",
-        text: buildParagraphText(lines.slice(startIndex, endIndex + 1)),
-      });
-      index = endIndex;
+    for (const include of injected.includes) {
+      await walk(resolveIncludedPath(file, include), [...stack, file]);
     }
   }
 
-  await walk(rootResourcePath);
-  return blocks;
+  await walk(rootResourcePath, []);
+
+  const rootPath = Path.join(
+    compileDir,
+    normalizeProjectPath(rootResourcePath),
+  );
+  if (markerCount > 0 && originals.has(rootPath)) {
+    const injected = await fsPromises.readFile(rootPath, "utf8");
+    await fsPromises.writeFile(rootPath, `${injected}\n${buildQueryBlock()}\n`);
+  }
+
+  return { markerCount, kinds };
 }
 
-function buildQueryWrapper(rootResourcePath) {
-  return `#include ${JSON.stringify(rootResourcePath)}
-
-#context [
-  #metadata((
-    headings: query(heading).map(h => {
-      let loc = h.location()
-      let pos = loc.position()
-      (
-        level: h.level,
-        text: repr(h.body),
-        page: counter(page).at(loc).first(),
-        x: pos.x,
-        y: pos.y,
-      )
-    }),
-    paragraphs: query(par).map(p => {
-      let loc = p.location()
-      let pos = loc.position()
-      (
-        text: repr(p.body),
-        page: counter(page).at(loc).first(),
-        x: pos.x,
-        y: pos.y,
-      )
-    }),
-    figures: query(figure).map(f => {
-      let loc = f.location()
-      let pos = loc.position()
-      (
-        text: repr(f.caption.body),
-        page: counter(page).at(loc).first(),
-        x: pos.x,
-        y: pos.y,
-      )
-    }),
-  )) ${TYPST_SYNC_LABEL}
-]`;
+async function restoreSources(originals) {
+  for (const [absolutePath, content] of originals) {
+    try {
+      await fsPromises.writeFile(absolutePath, content);
+    } catch (error) {
+      logger.error(
+        { err: error, absolutePath },
+        "failed to restore typst source after sync marker injection",
+      );
+    }
+  }
 }
 
-async function queryTypstBlocks(
+async function queryTypstMarkers(
   compileName,
   compileDir,
   rootResourcePath,
   imageName,
   timeout,
 ) {
-  const wrapperPath = Path.join(compileDir, TYPST_SYNC_QUERY);
-  await fsPromises.writeFile(wrapperPath, buildQueryWrapper(rootResourcePath));
-
   try {
     const command = [
       "typst",
       "query",
       "--root",
       "$COMPILE_DIR",
-      Path.join("$COMPILE_DIR", TYPST_SYNC_QUERY),
-      TYPST_SYNC_LABEL,
+      Path.join("$COMPILE_DIR", normalizeProjectPath(rootResourcePath)),
+      TYPST_SYNC_MAP_LABEL,
       "--format",
       "json",
     ];
@@ -313,133 +593,115 @@ async function queryTypstBlocks(
       undefined,
     );
     const result = JSON.parse(stdout);
-    return result?.[0]?.value || {};
+    return Array.isArray(result?.[0]?.value) ? result[0].value : [];
   } catch (error) {
     throw OError.tag(error, "error generating typst sync map", {
       compileDir,
       rootResourcePath,
     });
-  } finally {
-    await fsPromises.rm(wrapperPath, { force: true });
   }
 }
 
-function createEntry(source, query) {
-  const entry = {
-    file: source.file,
-    line: source.line,
-    endLine: source.endLine,
-    kind: source.kind,
-    level: source.level,
-    text: source.text,
-    page: Number(query.page),
-    x: parsePt(query.x),
-    y: parsePt(query.y),
-  };
-  return entry.page && entry.x != null && entry.y != null ? entry : null;
-}
+const beforeInDocument = (a, b) => a.page - b.page || a.y - b.y;
 
-function syncKey(text) {
-  return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-// The source scan and the rendered query disagree on how many blocks exist
-// (a document may render figures the scanner never saw, or contain source
-// paragraphs that produce no standalone rendered block), so equality has to
-// tolerate small differences in how inline markup survives rendering.
-function blocksMatch(source, query) {
-  const a = syncKey(source?.text);
-  const b = syncKey(normalizeTypstInline(query?.text));
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const prefix = Math.min(24, a.length, b.length);
-  return prefix > 0 && a.slice(0, prefix) === b.slice(0, prefix);
-}
-
-// Longest common subsequence over block text. Pairing by array index (the
-// previous approach) assumes the two lists line up one-to-one; when they do
-// not, every block after the first divergence inherits another block's
-// coordinates. Aligning on content instead keeps the pairs in document order
-// and simply drops blocks that have no counterpart, so a missing anchor
-// degrades to "no jump" rather than "jump somewhere wrong".
-function alignBlocks(sourceList, queryList) {
-  const n = sourceList.length;
-  const m = queryList.length;
-  const width = m + 1;
-  const dp = new Int32Array((n + 1) * width);
-
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) {
-      dp[i * width + j] = blocksMatch(sourceList[i], queryList[j])
-        ? dp[(i + 1) * width + (j + 1)] + 1
-        : Math.max(dp[(i + 1) * width + j], dp[i * width + (j + 1)]);
+// A marker can come back more times than it was injected. A heading is the
+// common case: the marker lives inside the heading body, so an `outline()`
+// renders it again on the contents page. A `#for` body does the same.
+//
+// Dropping the whole group loses every heading in a document with a table of
+// contents, and taking the first hits the contents page instead of the heading.
+// So pick the copy that sits where the file's own trajectory says it should:
+// after the anchor of the nearest line above it, before the nearest line below.
+// Nothing fits only when every copy is somewhere unrelated, and then dropping
+// is right.
+function chooseInDocumentOrder(candidates, settled) {
+  const line = candidates[0].line;
+  let previous = null;
+  let next = null;
+  for (const anchor of settled) {
+    if (anchor.line < line) previous = anchor;
+    else if (anchor.line > line) {
+      next = anchor;
+      break;
     }
   }
 
-  const pairs = [];
-  let i = 0;
-  let j = 0;
-  while (i < n && j < m) {
-    if (blocksMatch(sourceList[i], queryList[j])) {
-      pairs.push([sourceList[i], queryList[j]]);
-      i++;
-      j++;
-    } else if (dp[(i + 1) * width + j] >= dp[i * width + (j + 1)]) {
-      i++;
-    } else {
-      j++;
-    }
-  }
-  return pairs;
+  return (
+    candidates.find(
+      (candidate) =>
+        (previous == null || beforeInDocument(previous, candidate) <= 0) &&
+        (next == null || beforeInDocument(candidate, next) <= 0),
+    ) || null
+  );
 }
 
-function pairBlocks(sourceBlocks, queriedBlocks) {
-  const sourceByKind = {
-    heading: sourceBlocks.filter((block) => block.kind === "heading"),
-    paragraph: sourceBlocks.filter((block) => block.kind === "paragraph"),
-    figure: sourceBlocks.filter((block) => block.kind === "figure"),
-  };
+function buildEntries(queried, kinds) {
+  const parsed = [];
+  for (const item of queried) {
+    const file = normalizeProjectPath(String(item?.f ?? ""));
+    const line = Number(item?.l);
+    const page = Number(item?.page);
+    const x = parsePt(item?.x);
+    const y = parsePt(item?.y);
+    if (!file || !Number.isFinite(line) || !page || x == null || y == null) {
+      continue;
+    }
+    const info = kinds.get(`${file}:${line}`);
+    parsed.push({ file, line, kind: info?.kind || "paragraph", page, x, y });
+  }
 
-  const queryByKind = {
-    heading: Array.isArray(queriedBlocks.headings)
-      ? queriedBlocks.headings
-      : [],
-    paragraph: Array.isArray(queriedBlocks.paragraphs)
-      ? queriedBlocks.paragraphs
-      : [],
-    figure: Array.isArray(queriedBlocks.figures) ? queriedBlocks.figures : [],
-  };
+  // Grouped by source line, each group still in document order.
+  const groups = new Map();
+  for (const record of parsed) {
+    const key = `${record.file}:${record.line}`;
+    const existing = groups.get(key);
+    if (existing) existing.push(record);
+    else groups.set(key, [record]);
+  }
 
+  // Lines whose marker count came back exactly as injected are trustworthy --
+  // that includes a table row, where every cell is its own marker. They settle
+  // first so the ambiguous lines have a trajectory to be judged against.
   const entries = [];
-  for (const kind of ["heading", "paragraph", "figure"]) {
-    const sourceList = sourceByKind[kind];
-    const queryList = queryByKind[kind];
-    const pairs = alignBlocks(sourceList, queryList);
-
-    for (const [source, query] of pairs) {
-      const entry = createEntry(source, query);
-      if (entry) {
-        entries.push(entry);
-      }
-    }
-
-    if (pairs.length < sourceList.length) {
-      logger.debug(
-        {
-          kind,
-          sourceBlocks: sourceList.length,
-          queriedBlocks: queryList.length,
-          paired: pairs.length,
-        },
-        "typst sync blocks without a rendered counterpart; they get no anchor",
-      );
-    }
+  const contested = [];
+  for (const [key, candidates] of groups) {
+    const injected = kinds.get(key)?.injected ?? 1;
+    if (candidates.length <= injected) entries.push(...candidates);
+    else contested.push(candidates);
   }
 
-  entries.sort((left, right) => left.line - right.line);
+  const byFile = new Map();
+  for (const entry of entries) {
+    const list = byFile.get(entry.file);
+    if (list) list.push(entry);
+    else byFile.set(entry.file, [entry]);
+  }
+  for (const list of byFile.values()) {
+    list.sort((left, right) => left.line - right.line);
+  }
+
+  for (const candidates of contested) {
+    const settled = byFile.get(candidates[0].file) || [];
+    const chosen = chooseInDocumentOrder(candidates, settled);
+    if (chosen) entries.push(chosen);
+  }
+
+  // findCodeAnchor walks a file's entries expecting ascending line numbers.
+  entries.sort(
+    (left, right) =>
+      (left.file < right.file ? -1 : left.file > right.file ? 1 : 0) ||
+      left.line - right.line ||
+      left.page - right.page ||
+      left.y - right.y,
+  );
   return entries;
 }
 
+// Markers are injected *after* the PDF compile rather than before it: they are
+// zero-size, so the positions are the same either way, and a malformed
+// injection can then only cost sync rather than the user's compile. The query
+// still runs against the real root in the real compile tree, so the positions
+// come from the same document that produced the PDF.
 async function generateSyncMap({
   compileName,
   compileDir,
@@ -447,27 +709,47 @@ async function generateSyncMap({
   imageName,
   timeout = 60 * 1000,
 }) {
-  const sourceBlocks = await collectSourceBlocks(compileDir, rootResourcePath);
-  if (sourceBlocks.length === 0) {
-    await fsPromises.rm(getSyncMapPath(compileDir), { force: true });
-    return [];
+  const originals = new Map();
+
+  // The compile dir is reused between compiles, so a map left over from an
+  // earlier build would otherwise survive a failure here and send clicks to
+  // positions from a document that no longer exists.
+  await fsPromises.rm(getSyncMapPath(compileDir), { force: true });
+
+  try {
+    const { markerCount, kinds } = await injectSyncMarkers(
+      compileDir,
+      rootResourcePath,
+      originals,
+    );
+
+    if (markerCount === 0) {
+      return [];
+    }
+
+    const queried = await queryTypstMarkers(
+      compileName,
+      compileDir,
+      rootResourcePath,
+      imageName,
+      timeout,
+    );
+    const entries = buildEntries(queried, kinds);
+
+    logger.debug(
+      { markerCount, queried: queried.length, entries: entries.length },
+      "generated typst sync map",
+    );
+
+    await fsPromises.writeFile(
+      getSyncMapPath(compileDir),
+      JSON.stringify({ version: 3, entries }, null, 2),
+    );
+
+    return entries;
+  } finally {
+    await restoreSources(originals);
   }
-
-  const queriedBlocks = await queryTypstBlocks(
-    compileName,
-    compileDir,
-    rootResourcePath,
-    imageName,
-    timeout,
-  );
-  const entries = pairBlocks(sourceBlocks, queriedBlocks);
-
-  await fsPromises.writeFile(
-    getSyncMapPath(compileDir),
-    JSON.stringify({ version: 2, entries }, null, 2),
-  );
-
-  return entries;
 }
 
 async function loadSyncMap(directory) {
@@ -571,8 +853,9 @@ async function copySyncMapToBuild(compileDir, outputDir, buildId) {
 
 export default {
   TYPST_SYNC_MAP,
-  collectSourceBlocks,
-  pairBlocks,
+  buildQueryBlock,
+  injectMarkers,
+  stripMarkers,
   findCodeAnchor,
   findPdfAnchor,
   buildPdfHighlight,
@@ -581,7 +864,6 @@ export default {
   copySyncMapToBuild,
   normalizeProjectPath,
   promises: {
-    collectSourceBlocks,
     copySyncMapToBuild,
     generateSyncMap,
     loadSyncMap,
