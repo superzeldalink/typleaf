@@ -628,16 +628,31 @@ async function _checkFileExists(dir, filename) {
 }
 
 async function _loadTypstSyncMap(projectId, userId, opts) {
-  const directory = _getSyncOperationDirectory(projectId, userId, opts);
-  try {
-    const entries = await TypstSyncManager.promises.loadSyncMap(directory);
-    return entries.length > 0 ? entries : null;
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return null;
-    }
-    throw error;
+  // The viewer holds the buildId the PDF was rendered from, but the editor
+  // auto-compiles and OutputCacheManager prunes the old build dir underneath
+  // it. Without a fallback the first double-click works and every one after it
+  // 404s, which reads as "sync only works sometimes". The compile dir always
+  // holds the map for the newest build, which is the PDF on screen by then.
+  const directories = [_getSyncOperationDirectory(projectId, userId, opts)];
+  const compileDir = getCompileDir(projectId, userId);
+  if (!directories.includes(compileDir)) {
+    directories.push(compileDir);
   }
+
+  for (const directory of directories) {
+    try {
+      const entries = await TypstSyncManager.promises.loadSyncMap(directory);
+      if (entries.length > 0) {
+        return entries;
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+
+  return null;
 }
 
 function _getSyncOperationDirectory(projectId, userId, opts) {
