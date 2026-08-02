@@ -6,10 +6,12 @@ function OutlineRoot({
   outline,
   jumpToLine,
   highlightedLine,
+  highlightedDocId,
 }: {
   outline: OutlineItemData[]
-  jumpToLine: (line: number, syncToPdf: boolean) => void
+  jumpToLine: (line: number, syncToPdf: boolean, docId?: string) => void
   highlightedLine?: number
+  highlightedDocId?: string | null
 }) {
   const { t } = useTranslation()
 
@@ -21,6 +23,7 @@ function OutlineRoot({
           jumpToLine={jumpToLine}
           isRoot
           highlightedLine={highlightedLine}
+          highlightedDocId={highlightedDocId}
           containsHighlightedLine
         />
       ) : (

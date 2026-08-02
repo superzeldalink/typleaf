@@ -13,6 +13,7 @@ const OutlinePane = React.memo<{
   onToggle(value: boolean): void
   eventTracking: any
   highlightedLine?: number
+  highlightedDocId?: string | null
   show: boolean
   isPartial?: boolean
   expanded?: boolean
@@ -23,6 +24,7 @@ const OutlinePane = React.memo<{
   jumpToLine,
   onToggle,
   highlightedLine,
+  highlightedDocId,
   isPartial = false,
   expanded,
   toggleExpanded,
@@ -54,6 +56,7 @@ const OutlinePane = React.memo<{
             outline={outline}
             jumpToLine={jumpToLine}
             highlightedLine={highlightedLine}
+            highlightedDocId={highlightedDocId}
           />
         </div>
       )}

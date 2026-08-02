@@ -11,6 +11,8 @@ export type Outline = {
   title: string
   level: number
   children?: Outline[]
+  docId?: string
+  path?: string
 }
 
 /**
@@ -198,10 +200,14 @@ const flatItemToOutline = (item: {
   title: string
   line: number
   level: number
+  docId?: string
+  path?: string
 }): Outline => ({
   title: item.title,
   line: item.line,
   level: item.level,
+  docId: item.docId,
+  path: item.path,
 })
 
 export const nestOutline = (flatOutline: PartialFlatOutline): Outline[] => {

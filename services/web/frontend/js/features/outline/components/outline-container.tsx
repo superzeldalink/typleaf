@@ -7,6 +7,7 @@ import useNestedOutline from '../hooks/use-nested-outline'
 export const OutlineContainer: FC = memo(() => {
   const {
     highlightedLine,
+    highlightedDocId,
     canShowOutline,
     jumpToLine,
     outlineExpanded,
@@ -25,6 +26,7 @@ export const OutlineContainer: FC = memo(() => {
         isTexFile={canShowOutline}
         jumpToLine={jumpToLine}
         highlightedLine={highlightedLine}
+        highlightedDocId={highlightedDocId}
         isPartial={outline.partial}
         expanded={outlineExpanded}
         toggleExpanded={toggleOutlineExpanded}

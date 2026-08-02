@@ -9,12 +9,14 @@ const OutlineItem = memo(function OutlineItem({
   outlineItem,
   jumpToLine,
   highlightedLine,
+  highlightedDocId,
   matchesHighlightedLine,
   containsHighlightedLine,
 }: {
   outlineItem: OutlineItemData
-  jumpToLine: (line: number, syncToPdf: boolean) => void
+  jumpToLine: (line: number, syncToPdf: boolean, docId?: string) => void
   highlightedLine?: number | null
+  highlightedDocId?: string | null
   matchesHighlightedLine?: boolean
   containsHighlightedLine?: boolean
 }) {
@@ -35,7 +37,7 @@ const OutlineItem = memo(function OutlineItem({
 
   function handleOutlineItemLinkClick(event: React.MouseEvent) {
     const syncToPdf = event.detail === 2 // double-click = sync to PDF
-    jumpToLine(outlineItem.line, syncToPdf)
+    jumpToLine(outlineItem.line, syncToPdf, outlineItem.docId)
   }
 
   useEffect(() => {
@@ -89,6 +91,7 @@ const OutlineItem = memo(function OutlineItem({
           jumpToLine={jumpToLine}
           isRoot={false}
           highlightedLine={containsHighlightedLine ? highlightedLine : null}
+          highlightedDocId={highlightedDocId}
           containsHighlightedLine={containsHighlightedLine}
         />
       ) : null}

@@ -16,11 +16,18 @@ import { useProjectContext } from '@/shared/context/project-context'
 import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
 import { useFileTreeOpenContext } from './file-tree-open-context'
 import { useEditorAnalytics } from '@/shared/hooks/use-editor-analytics'
+import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
 
 export type PartialFlatOutline = {
   level: number
   title: string
   line: number
+  /**
+   * Set only for a document-wide outline, where a heading may belong to a file
+   * other than the one on screen. Absent means "the open file".
+   */
+  docId?: string
+  path?: string
 }[]
 
 export type FlatOutlineState =
@@ -35,7 +42,13 @@ const OutlineContext = createContext<
       flatOutline: FlatOutlineState
       setFlatOutline: Dispatch<SetStateAction<FlatOutlineState>>
       highlightedLine: number
-      jumpToLine: (lineNumber: number, syncToPdf: boolean) => void
+      /** The file the highlighted line belongs to; see outlineItemKey. */
+      highlightedDocId: string | null
+      jumpToLine: (
+        lineNumber: number,
+        syncToPdf: boolean,
+        docId?: string
+      ) => void
       canShowOutline: boolean
       outlineExpanded: boolean
       toggleOutlineExpanded: () => void
@@ -54,6 +67,8 @@ export const OutlineProvider: FC<React.PropsWithChildren> = ({ children }) => {
     useState<boolean>(false)
   const [ignoreNextScroll, setIgnoreNextScroll] = useState<boolean>(false)
   const { sendEvent } = useEditorAnalytics()
+  const { currentDocumentId: openDocId } = useEditorOpenDocContext()
+  const { openDocWithId } = useEditorManagerContext()
 
   const goToLineEmitter = useScopeEventEmitter('editor:gotoLine', true)
 
@@ -104,22 +119,37 @@ export const OutlineProvider: FC<React.PropsWithChildren> = ({ children }) => {
   )
 
   const jumpToLine = useCallback(
-    (lineNumber: number, syncToPdf: boolean) => {
+    (lineNumber: number, syncToPdf: boolean, docId?: string) => {
       setIgnoreNextScroll(true)
-      goToLineEmitter({
-        gotoLine: lineNumber,
-        gotoColumn: 0,
-        syncToPdf,
-      })
+      // A document-wide outline can point at a heading in a file that is not
+      // open. Switch to it first; openDocWithId scrolls to the line itself, so
+      // emitting a goto for the old document would jump the wrong editor.
+      if (docId && docId !== openDocId) {
+        openDocWithId(docId, { gotoLine: lineNumber, gotoColumn: 0 })
+      } else {
+        goToLineEmitter({
+          gotoLine: lineNumber,
+          gotoColumn: 0,
+          syncToPdf,
+        })
+      }
       sendEvent('outline-jump-to-line')
     },
-    [goToLineEmitter, sendEvent]
+    [goToLineEmitter, sendEvent, openDocId, openDocWithId]
   )
 
+  // In a document-wide outline the items span several files, so line numbers
+  // from another file would otherwise compete for the highlight. Only the
+  // headings in the file on screen can match the cursor.
   const highlightedLine = useMemo(
     () =>
-      closestSectionLineNumber(flatOutline?.items, currentlyHighlightedLine),
-    [flatOutline, currentlyHighlightedLine]
+      closestSectionLineNumber(
+        flatOutline?.items.filter(
+          item => item.docId === undefined || item.docId === openDocId
+        ),
+        currentlyHighlightedLine
+      ),
+    [flatOutline, currentlyHighlightedLine, openDocId]
   )
 
   const { openDocName } = useEditorOpenDocContext()
@@ -169,6 +199,7 @@ export const OutlineProvider: FC<React.PropsWithChildren> = ({ children }) => {
       flatOutline,
       setFlatOutline,
       highlightedLine,
+      highlightedDocId: openDocId,
       jumpToLine,
       canShowOutline,
       outlineExpanded,
@@ -179,6 +210,7 @@ export const OutlineProvider: FC<React.PropsWithChildren> = ({ children }) => {
     [
       flatOutline,
       highlightedLine,
+      openDocId,
       jumpToLine,
       canShowOutline,
       outlineExpanded,

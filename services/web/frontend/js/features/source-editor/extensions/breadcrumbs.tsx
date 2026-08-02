@@ -4,30 +4,38 @@ import {
 } from '@/features/file-tree/util/find-in-tree'
 import { useFileTreeOpenContext } from '@/features/ide-react/context/file-tree-open-context'
 import { useOutlineContext } from '@/features/ide-react/context/outline-context'
-import useNestedOutline from '@/features/outline/hooks/use-nested-outline'
-import getChildrenLines from '@/features/outline/util/get-children-lines'
+import getChildrenKeys, {
+  highlightedItemKey,
+  outlineItemKey,
+} from '@/features/outline/util/get-children-keys'
 import MaterialIcon from '@/shared/components/material-icon'
 import { useFileTreeData } from '@/shared/context/file-tree-data-context'
 import { Fragment, useMemo } from 'react'
-import { Outline } from '@/features/source-editor/utils/tree-operations/outline'
+import {
+  nestOutline,
+  Outline,
+} from '@/features/source-editor/utils/tree-operations/outline'
 
+// Matched on (file, line) rather than the line alone: a document-wide outline
+// spans several files, and the same line number in two of them would otherwise
+// both look like the cursor's section.
 const constructOutlineHierarchy = (
   items: Outline[],
-  highlightedLine: number,
+  highlightedKey: string,
   outlineHierarchy: Outline[] = []
 ) => {
   for (const item of items) {
-    if (item.line === highlightedLine) {
+    if (outlineItemKey(item) === highlightedKey) {
       outlineHierarchy.push(item)
       return outlineHierarchy
     }
 
-    const childLines = getChildrenLines(item.children)
-    if (childLines.includes(highlightedLine)) {
+    const childKeys = getChildrenKeys(item.children)
+    if (childKeys.includes(highlightedKey)) {
       outlineHierarchy.push(item)
       return constructOutlineHierarchy(
         item.children as Outline[],
-        highlightedLine,
+        highlightedKey,
         outlineHierarchy
       )
     }
@@ -38,8 +46,22 @@ const constructOutlineHierarchy = (
 export default function Breadcrumbs() {
   const { openEntity } = useFileTreeOpenContext()
   const { fileTreeData } = useFileTreeData()
-  const outline = useNestedOutline()
-  const { highlightedLine, canShowOutline } = useOutlineContext()
+  const { flatOutline, highlightedLine, highlightedDocId, canShowOutline } =
+    useOutlineContext()
+
+  // The section path is kept to the open file even though the outline panel
+  // spans the whole document: the folder path to the left already says where
+  // the file sits, so headings from a parent file would repeat that and, worse,
+  // read as if they lived in the file on screen.
+  const outline = useMemo(
+    () =>
+      nestOutline(
+        (flatOutline?.items ?? []).filter(
+          item => item.docId === undefined || item.docId === highlightedDocId
+        )
+      ),
+    [flatOutline, highlightedDocId]
+  )
 
   const folderHierarchy = useMemo(() => {
     if (openEntity?.type !== 'doc' || !fileTreeData) {
@@ -69,12 +91,16 @@ export default function Breadcrumbs() {
   }, [fileTreeData, openEntity])
 
   const outlineHierarchy = useMemo(() => {
-    if (openEntity?.type !== 'doc' || !canShowOutline || !outline) {
+    if (openEntity?.type !== 'doc' || !canShowOutline) {
       return []
     }
 
-    return constructOutlineHierarchy(outline.items, highlightedLine)
-  }, [outline, highlightedLine, canShowOutline, openEntity])
+    const highlightedKey = highlightedItemKey(highlightedDocId, highlightedLine)
+    if (highlightedKey === null) {
+      return []
+    }
+    return constructOutlineHierarchy(outline, highlightedKey)
+  }, [outline, highlightedLine, highlightedDocId, canShowOutline, openEntity])
 
   if (openEntity?.type !== 'doc' || !fileTreeData) {
     return null
@@ -94,7 +120,7 @@ export default function Breadcrumbs() {
       <div>{fileName}</div>
       {numOutlineItems > 0 && <Chevron />}
       {outlineHierarchy.map((section, idx) => (
-        <Fragment key={section.line}>
+        <Fragment key={outlineItemKey(section)}>
           <div>{section.title}</div>
           {idx < numOutlineItems - 1 && <Chevron />}
         </Fragment>

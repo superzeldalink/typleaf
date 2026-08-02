@@ -28,7 +28,10 @@ const outlineChanged = (
     if (
       aItem.level !== bItem.level ||
       aItem.line !== bItem.line ||
-      aItem.title !== bItem.title
+      aItem.title !== bItem.title ||
+      // Without this, two files with the same heading on the same line look
+      // identical and the outline would not re-render across a document.
+      aItem.docId !== bItem.docId
     ) {
       return true
     }
