@@ -64,12 +64,18 @@ export default CommandRunner = {
     const proc = spawn(command[0], command.slice(1), {
       cwd: spawnCwd,
       env,
-      stdio: ['pipe', 'pipe', 'ignore'],
+      // stderr was 'ignore', which silently threw away everything typst
+      // reports -- it writes no log file and puts all diagnostics on stderr,
+      // so a failed compile reached the editor with nothing to show. The
+      // docker runner captures both streams; this keeps them in step.
+      stdio: ['pipe', 'pipe', 'pipe'],
       detached: true,
     })
 
     let stdout = ''
+    let stderr = ''
     proc.stdout.setEncoding('utf8').on('data', data => (stdout += data))
+    proc.stderr.setEncoding('utf8').on('data', data => (stderr += data))
 
     proc.on('error', function (err) {
       killedPids.delete(proc.pid)
@@ -84,17 +90,20 @@ export default CommandRunner = {
       let err
       logger.debug({ code, signal, projectId }, 'command exited')
       const wasKilled = killedPids.delete(proc.pid)
+      // The output is handed back alongside the error too: a failed compile is
+      // exactly when its log is worth reading, and callers that only care
+      // about the error can still ignore the second argument.
       if (signal === 'SIGTERM' || wasKilled) {
         err = new Error('terminated')
         err.terminated = true
-        return callback(err)
+        return callback(err, { stdout, stderr, exitCode: code })
       } else if (code === 1) {
         // exit status from chktex
         err = new Error('exited')
         err.code = code
-        return callback(err)
+        return callback(err, { stdout, stderr, exitCode: code })
       } else {
-        return callback(null, { stdout, exitCode: code })
+        return callback(null, { stdout, stderr, exitCode: code })
       }
     })
 

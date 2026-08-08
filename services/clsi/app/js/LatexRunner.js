@@ -79,8 +79,24 @@ function runLatex(projectId, options, callback) {
     null,
     function (error, output) {
       delete ProcessTable[id]
+      // typst exits 1 when the document has errors, which is a compile that
+      // ran and failed, not a broken request. latexmk reports the same
+      // condition with an exit code the runner already treats as success,
+      // which is why a failing LaTeX compile returns its log while a failing
+      // Typst one failed the whole CLSI call and reached the editor as a bare
+      // "something went wrong" with nothing to read.
+      if (error && compiler === 'typst' && error.code === 1) {
+        stats['typst-errors'] = 1
+        error = null
+      }
       if (error) {
-        return callback(error)
+        // Write the log before bailing out. A failed compile is when the log
+        // matters most, and returning here meant a failing Typst compile
+        // produced no log at all -- latexmk writes its own output.log, so the
+        // gap only showed up for Typst.
+        return _writeLogOutput(projectId, directory, compiler, output, () => {
+          callback(error, output)
+        })
       }
       if (stats.latexmk) {
         try {
@@ -113,14 +129,14 @@ function runLatex(projectId, options, callback) {
         }
       }
       // record output files
-      _writeLogOutput(projectId, directory, output, () => {
+      _writeLogOutput(projectId, directory, compiler, output, () => {
         callback(error, output)
       })
     }
   )
 }
 
-function _writeLogOutput(projectId, directory, output, callback) {
+function _writeLogOutput(projectId, directory, compiler, output, callback) {
   if (!output) {
     return callback()
   }
@@ -143,7 +159,18 @@ function _writeLogOutput(projectId, directory, output, callback) {
   // write stdout and stderr, ignoring errors
   _writeFile(Path.join(directory, 'output.stdout'), output.stdout, () => {
     _writeFile(Path.join(directory, 'output.stderr'), output.stderr, () => {
-      callback()
+      // latexmk leaves an output.log behind for the editor to read back; typst
+      // reports everything on stderr and writes no log at all, which is why a
+      // failed Typst compile used to surface as a bare "there is an error"
+      // with nothing to read. Give it the same output.log the frontend already
+      // knows how to fetch.
+      if (compiler !== 'typst') {
+        return callback()
+      }
+      const typstLog = [output.stderr, output.stdout]
+        .filter(part => part && part.length > 0)
+        .join('\n')
+      _writeFile(Path.join(directory, 'output.log'), typstLog, callback)
     })
   })
 }
