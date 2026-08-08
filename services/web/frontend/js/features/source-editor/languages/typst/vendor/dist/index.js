@@ -59,7 +59,12 @@ class TypstParser extends Parser {
     updateListener() {
         let parser = this;
         return StateField.define({
-            create() { return null; },
+            // LOCAL PATCH (see note at clearParser): a fresh EditorState means the
+            // document was replaced wholesale -- switching between two .typ files,
+            // for example. That does not arrive as a change transaction, so without
+            // this the wasm parser keeps the previous file's text and the next
+            // edit() applies the new document's offsets to the old buffer.
+            create() { parser.clearParser(); return null; },
             update(value, transaction) {
                 if (transaction.startState.facet(language) != transaction.state.facet(language)) {
                     parser.clearParser();
@@ -67,8 +72,27 @@ class TypstParser extends Parser {
                 }
                 if (transaction.docChanged) {
                     transaction.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
-                        var _a;
-                        let edits = (_a = parser.parser) === null || _a === void 0 ? void 0 : _a.edit(fromA, toA, inserted.toString());
+                        if (parser.parser == null) {
+                            return;
+                        }
+                        let edits;
+                        try {
+                            edits = parser.parser.edit(fromA, toA, inserted.toString());
+                        }
+                        catch (error) {
+                            // LOCAL PATCH: a parser fault must not escape into the
+                            // transaction. This runs inside dispatch, so throwing
+                            // aborts the update and loses the user's keystroke --
+                            // and in a production build there is no overlay to say
+                            // why. Dropping the parser makes the next parse rebuild
+                            // from the current document instead.
+                            console.error('typst parser edit failed, reparsing', error);
+                            parser.clearParser();
+                            return;
+                        }
+                        if (edits == null) {
+                            return;
+                        }
                         if (edits.full_update) {
                             parser.clearTree();
                         }
