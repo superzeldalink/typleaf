@@ -10,6 +10,9 @@ import { EDITOR_SESSION_ID } from '@/features/pdf-preview/util/metrics'
 import { LogEntry } from './types'
 import { CompileResponseData, PDFFile } from '@ol-types/compile'
 import { LatexLogEntry } from '@/ide/log-parser/latex-log-parser'
+import parseTypstLog, {
+  looksLikeTypstLog,
+} from '@/ide/log-parser/typst-log-parser'
 import { Annotation } from '@ol-types/annotation'
 import { Folder } from '@ol-types/folder'
 
@@ -127,19 +130,26 @@ export async function handleLogFiles(
       MAX_LOG_SIZE
     )
     try {
-      let { errors, warnings, typesetting } = HumanReadableLogs.parse(
-        result.log,
-        {
-          ignoreDuplicates: true,
+      // Typst reports in its own format, which the LaTeX parser reads as an
+      // empty log -- leaving the user with "there is an error" and nothing
+      // else. Parse it properly so the message, file and line come through.
+      if (looksLikeTypstLog(result.log)) {
+        accumulateResults(parseTypstLog(result.log))
+      } else {
+        let { errors, warnings, typesetting } = HumanReadableLogs.parse(
+          result.log,
+          {
+            ignoreDuplicates: true,
+          }
+        )
+
+        if (data.status === 'stopped-on-first-error') {
+          // Hide warnings that could disappear after a second pass
+          warnings = warnings.filter(warning => !isTransientWarning(warning))
         }
-      )
 
-      if (data.status === 'stopped-on-first-error') {
-        // Hide warnings that could disappear after a second pass
-        warnings = warnings.filter(warning => !isTransientWarning(warning))
+        accumulateResults({ errors, warnings, typesetting })
       }
-
-      accumulateResults({ errors, warnings, typesetting })
     } catch (e) {
       debugConsole.warn(e) // ignore failure to parse the log file, but log a warning
     }
